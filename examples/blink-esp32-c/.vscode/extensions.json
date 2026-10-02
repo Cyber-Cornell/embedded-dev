@@ -1,0 +1,7 @@
+{
+  "recommendations": [
+    "mkhl.direnv",
+    "llvm-vs-code-extensions.vscode-clangd"
+  ],
+  "unwantedRecommendations": ["ms-vscode.cpptools"]
+}

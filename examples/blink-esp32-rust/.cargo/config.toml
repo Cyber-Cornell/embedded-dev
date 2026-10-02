@@ -1,0 +1,15 @@
+[build]
+# ESP32 (Xtensa LX6). For RISC-V chips use e.g. riscv32imc-unknown-none-elf
+# (ESP32-C3) and switch the esp-hal feature in Cargo.toml.
+target = "xtensa-esp32-none-elf"
+
+[target.xtensa-esp32-none-elf]
+runner = "espflash flash --monitor --chip esp32"
+rustflags = ["-C", "link-arg=-nostartfiles", "-C", "link-arg=-Wl,-Tlinkall.x"]
+
+[env]
+ESP_LOG = "info"
+
+[unstable]
+# There is no prebuilt core library for Xtensa; build it from rust-src.
+build-std = ["core"]

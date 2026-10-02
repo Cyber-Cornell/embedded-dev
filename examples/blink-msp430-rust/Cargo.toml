@@ -1,0 +1,25 @@
+[package]
+name = "blink"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+msp430 = { version = "0.4", features = ["critical-section-single-core"] }
+msp430-rt = "0.4"
+msp430g2553 = { version = "0.4", features = ["rt", "critical-section"] }
+panic-msp430 = "0.4"
+
+[[bin]]
+name = "blink"
+test = false
+bench = false
+
+[profile.dev]
+# The G2553 has 16 KiB of flash; unoptimised Rust doesn't fit comfortably.
+opt-level = "s"
+
+[profile.release]
+debug = 2
+lto = "fat"
+codegen-units = 1
+opt-level = "s"

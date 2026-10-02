@@ -1,0 +1,11 @@
+# ESP-IDF passes a few GCC-only flags that clang rejects as unknown arguments.
+# They only affect code generation, so dropping them for clangd is harmless.
+CompileFlags:
+  Remove:
+    - -fno-shrink-wrap
+    - -fstrict-volatile-bitfields
+    - -fno-tree-switch-conversion
+    - -fno-malloc-dce
+    - -mlongcalls
+    - -mtext-section-literals
+    - -specs=*

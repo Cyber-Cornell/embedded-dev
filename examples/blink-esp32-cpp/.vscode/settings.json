@@ -1,0 +1,21 @@
+{
+  // Restart extensions (clangd included) whenever direnv loads the dev shell,
+  // so they see the toolchain and the shell's clangd on PATH.
+  "direnv.restart.automatic": true,
+  // Use the clangd from the dev shell; never offer to download another one.
+  "clangd.checkUpdates": false,
+
+  // clangd provides IntelliSense. Microsoft's C/C++ engine is disabled so the
+  // two don't publish conflicting diagnostics.
+  "C_Cpp.intelliSenseEngine": "disabled",
+  // The `esp32` shell puts Espressif's esp-clang clangd first on PATH; unlike
+  // upstream clangd it understands the Xtensa target and ESP-IDF's GCC flags.
+  "clangd.arguments": [
+    "--query-driver=/nix/store/**/bin/*",
+    "--compile-commands-dir=${workspaceFolder}/build",
+    "--header-insertion=never",
+    "--background-index"
+  ],
+  // idf.py drives the build; keep CMake Tools from configuring it separately.
+  "cmake.configureOnOpen": false
+}

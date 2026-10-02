@@ -1,0 +1,22 @@
+[package]
+name = "blink"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+cortex-m = "0.7"
+cortex-m-rt = "0.7"
+embedded-hal = "1.0"
+panic-halt = "1.0"
+rp2040-boot2 = "0.3"
+rp2040-hal = { version = "0.12", features = ["rt", "critical-section-impl"] }
+
+[[bin]]
+name = "blink"
+test = false
+bench = false
+
+[profile.release]
+debug = 2
+lto = true
+opt-level = "s"

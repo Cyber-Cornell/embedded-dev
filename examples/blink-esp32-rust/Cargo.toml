@@ -1,0 +1,24 @@
+[package]
+name = "blink"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+esp-hal = { version = "1.2", features = ["esp32"] }
+# Image header the ESP-IDF second-stage bootloader (flashed by espflash) checks.
+esp-bootloader-esp-idf = { version = "0.6", features = ["esp32"] }
+
+[[bin]]
+name = "blink"
+test = false
+bench = false
+
+[profile.dev]
+# Unoptimised Xtensa code is very slow and large; optimise even debug builds.
+opt-level = "s"
+
+[profile.release]
+debug = 2
+lto = "fat"
+codegen-units = 1
+opt-level = "s"

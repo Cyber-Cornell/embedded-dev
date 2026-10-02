@@ -1,0 +1,21 @@
+[package]
+name = "blink"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+cortex-m = { version = "0.7", features = ["critical-section-single-core"] }
+cortex-m-rt = "0.7"
+panic-halt = "1.0"
+# Pick the feature matching your part, e.g. stm32f411 for a Black Pill.
+stm32f4xx-hal = { version = "0.23", features = ["stm32f401"] }
+
+[[bin]]
+name = "blink"
+test = false
+bench = false
+
+[profile.release]
+debug = 2
+lto = true
+opt-level = "s"

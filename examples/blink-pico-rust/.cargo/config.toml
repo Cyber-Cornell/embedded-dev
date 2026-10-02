@@ -1,0 +1,8 @@
+[build]
+target = "thumbv6m-none-eabi" # RP2040 (Cortex-M0+)
+
+[target.thumbv6m-none-eabi]
+# Hold BOOTSEL while plugging the Pico in, then `cargo run --release`.
+# With a debug probe instead: runner = "probe-rs run --chip RP2040"
+runner = "picotool load -u -v -x -t elf"
+rustflags = ["-C", "link-arg=--nmagic", "-C", "link-arg=-Tlink.x"]
