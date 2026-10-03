@@ -4,12 +4,12 @@ Reproducible Nix dev shells for embedded targets in C, C++ and Rust. VS Code's
 language servers understand each cross toolchain, so you don't get false
 "header not found" or "undeclared identifier" warnings.
 
-| Shell   | Targets                                  | C / C++                                                          | Rust                                                 |
-| ------- | ---------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------- |
-| `pico`  | RP2040 / RP2350 (Pico, Pico W, Pico 2)   | arm-none-eabi GCC, pico-sdk (with submodules), picotool, OpenOCD | stable + Cortex-M targets, probe-rs                  |
-| `esp32` | ESP32, -S2, -S3, -C2, -C3, -C6, -H2, -P4 | ESP-IDF v5.5 (Xtensa + RISC-V GCC, esp-clang, esptool)           | Espressif's Xtensa rustc (`espup`'s build), espflash |
-| `stm32` | STM32 and other Cortex-M parts           | arm-none-eabi GCC, OpenOCD, stlink, probe-rs                     | stable + Cortex-M targets                            |
-| `ti`    | TI MSP430                                | TI msp430-elf GCC + device headers/linker scripts, mspdebug      | nightly + `rust-src` (`-Zbuild-std`)                 |
+| Shell | Targets | C / C++ | Rust |
+| --- | --- | --- | --- |
+| `pico` | RP2040 / RP2350 (Pico, Pico W, Pico 2) | arm-none-eabi GCC, pico-sdk (with submodules), picotool, OpenOCD | stable + Cortex-M targets, probe-rs |
+| `esp32` | ESP32, -S2, -S3, -C2, -C3, -C6, -H2, -P4 | ESP-IDF v5.5 (Xtensa + RISC-V GCC, esp-clang, esptool) | Espressif's Xtensa rustc (`espup`'s build), espflash |
+| `stm32` | STM32 and other Cortex-M parts | arm-none-eabi GCC, OpenOCD, stlink, probe-rs | stable + Cortex-M targets |
+| `ti` | TI MSP430 | TI msp430-elf GCC + device headers/linker scripts, mspdebug | nightly + `rust-src` (`-Zbuild-std`) |
 
 Every shell also has `cmake`, `ninja`, `make`, `bear`, `picocom`, `python3`, a
 host C compiler (for Cargo build scripts), a `clangd` and a `rust-analyzer` that
@@ -22,12 +22,12 @@ match the shell's toolchains.
 
 Every board has a blink example in each language, under `examples/blink-<board>-<lang>`:
 
-| Board                    | Shell   | C                                                | C++                                                | Rust                                          |
-| ------------------------ | ------- | ------------------------------------------------ | -------------------------------------------------- | --------------------------------------------- |
-| Raspberry Pi Pico        | `pico`  | [pico-sdk](examples/blink-pico-c)                | [pico-sdk](examples/blink-pico-cpp)                | [rp2040-hal](examples/blink-pico-rust)        |
-| ESP32 DevKit             | `esp32` | [ESP-IDF](examples/blink-esp32-c)                | [ESP-IDF](examples/blink-esp32-cpp)                | [esp-hal](examples/blink-esp32-rust)          |
-| Nucleo-F401RE            | `stm32` | [bare metal](examples/blink-stm32-c)             | [bare metal](examples/blink-stm32-cpp)             | [stm32f4xx-hal](examples/blink-stm32-rust)    |
-| MSP-EXP430G2ET LaunchPad | `ti`    | [msp430.h, Timer_A ISR](examples/blink-msp430-c) | [msp430.h, Timer_A ISR](examples/blink-msp430-cpp) | [msp430g2553 PAC](examples/blink-msp430-rust) |
+| Board | Shell | C | C++ | Rust |
+| --- | --- | --- | --- | --- |
+| Raspberry Pi Pico | `pico` | [pico-sdk](examples/blink-pico-c) | [pico-sdk](examples/blink-pico-cpp) | [rp2040-hal](examples/blink-pico-rust) |
+| ESP32 DevKit | `esp32` | [ESP-IDF](examples/blink-esp32-c) | [ESP-IDF](examples/blink-esp32-cpp) | [esp-hal](examples/blink-esp32-rust) |
+| Nucleo-F401RE | `stm32` | [bare metal](examples/blink-stm32-c) | [bare metal](examples/blink-stm32-cpp) | [stm32f4xx-hal](examples/blink-stm32-rust) |
+| MSP-EXP430G2ET LaunchPad | `ti` | [msp430.h, Timer_A ISR](examples/blink-msp430-c) | [msp430.h, Timer_A ISR](examples/blink-msp430-cpp) | [msp430g2553 PAC](examples/blink-msp430-rust) |
 
 Each example is also a flake template named `<board>-<lang>`:
 
