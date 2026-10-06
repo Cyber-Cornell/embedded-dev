@@ -10,6 +10,8 @@ language servers understand each cross toolchain, so you don't get false
 | `esp32` | ESP32, -S2, -S3, -C2, -C3, -C6, -H2, -P4 | ESP-IDF v5.5 (Xtensa + RISC-V GCC, esp-clang, esptool) | Espressif's Xtensa rustc (`espup`'s build), espflash |
 | `stm32` | STM32 and other Cortex-M parts | arm-none-eabi GCC, OpenOCD, stlink, probe-rs | stable + Cortex-M targets |
 | `ti` | TI MSP430 | TI msp430-elf GCC + device headers/linker scripts, mspdebug | nightly + `rust-src` (`-Zbuild-std`) |
+| `rpi` | Raspberry Pi 3, 4, 5, Zero, Zero W, Zero 2 W (Linux userspace) | static musl GCC for aarch64 and ARMv6 hard-float, `rpi-run` | stable + `aarch64-unknown-linux-musl`, `arm-unknown-linux-musleabihf` |
+| `rpi-baremetal` | Raspberry Pi 3, 4, 5, Zero, Zero W, Zero 2 W (no OS) | aarch64-none-elf + arm-none-eabi GCC, GPU firmware, `rpi-boot` | nightly + `rust-src` (`-Zbuild-std`): `aarch64-unknown-none-softfloat`, `armv6-none-eabihf` |
 
 Every shell also has `cmake`, `ninja`, `make`, `bear`, `picocom`, `python3`, a
 host C compiler (for Cargo build scripts), a `clangd` and a `rust-analyzer` that
@@ -28,6 +30,8 @@ Every board has a blink example in each language, under `examples/blink-<board>-
 | ESP32 DevKit | `esp32` | [ESP-IDF](examples/blink-esp32-c) | [ESP-IDF](examples/blink-esp32-cpp) | [esp-hal](examples/blink-esp32-rust) |
 | Nucleo-F401RE | `stm32` | [bare metal](examples/blink-stm32-c) | [bare metal](examples/blink-stm32-cpp) | [stm32f4xx-hal](examples/blink-stm32-rust) |
 | MSP-EXP430G2ET LaunchPad | `ti` | [msp430.h, Timer_A ISR](examples/blink-msp430-c) | [msp430.h, Timer_A ISR](examples/blink-msp430-cpp) | [msp430g2553 PAC](examples/blink-msp430-rust) |
+| Raspberry Pi 3 / 4 / 5 / Zero (all), Linux | `rpi` | [GPIO uAPI](examples/blink-rpi-c) | [GPIO uAPI](examples/blink-rpi-cpp) | [gpiocdev](examples/blink-rpi-rust) |
+| Raspberry Pi 3 / 4 / 5 / Zero (all), bare metal | `rpi-baremetal` | [registers](examples/blink-rpi-baremetal-c) | [registers](examples/blink-rpi-baremetal-cpp) | [registers](examples/blink-rpi-baremetal-rust) |
 
 Each example is also a flake template named `<board>-<lang>`:
 
@@ -48,6 +52,16 @@ cmake --preset default && cmake --build build
 cmake --build build --target flash          # stm32 / msp430 examples
 #   pico: hold BOOTSEL, plug in, then  picotool load -x build/blink.uf2
 
+# C / C++ (rpi): copies the binary to the Pi over SSH and runs it there
+export RPI_HOST=user@raspberrypi.local       # the default host is raspberrypi.local
+cmake --preset default && cmake --build build --target run              # 64-bit OS
+cmake --preset armv6 && cmake --build build-armv6 --target run          # Zero / Zero W, 32-bit OS
+
+# C / C++ (rpi-baremetal): writes the boot files to a mounted FAT32 SD card
+export RPI_BOOT_DIR=/run/media/$USER/BOOT    # unset: build/boot, copy it yourself
+cmake --preset default && cmake --build build --target flash            # kernel8.img: Pi 3, 4, 5, Zero 2 W
+cmake --preset armv6 && cmake --build build-armv6 --target flash        # kernel.img: Zero / Zero W
+
 # C / C++ (esp32)
 idf.py set-target esp32 && idf.py build
 idf.py -p /dev/ttyUSB0 flash monitor # Linux user needs to be added to group "dialout"
@@ -55,10 +69,13 @@ idf.py -p /dev/ttyUSB0 flash monitor # Linux user needs to be added to group "di
 # Rust (all boards): the runner in .cargo/config.toml flashes the board
 cargo build --release
 cargo run --release
+cargo run --release --target arm-unknown-linux-musleabihf   # rpi: Zero / Zero W, 32-bit OS
+cargo run --release --target armv6-none-eabihf              # rpi-baremetal: Zero / Zero W
 ```
 
 The Rust runners are `picotool` (Pico in BOOTSEL mode), `probe-rs` (Nucleo
-ST-Link), `espflash` (ESP32) and `mspdebug tilib` (LaunchPad eZ-FET).
+ST-Link), `espflash` (ESP32), `mspdebug tilib` (LaunchPad eZ-FET) and
+`rpi-run` (Raspberry Pi over SSH) and `rpi-boot` (Raspberry Pi SD card).
 
 ## One-time setup (NixOS)
 
@@ -143,6 +160,8 @@ flake.nix                 dev shells, packages, templates
 nix/clangd.nix            unwrapped clangd / clang-format / clang-tidy
 nix/msp430-gcc.nix        TI MSP430 GCC + device support files
 nix/esp-rust.nix          Espressif's Rust toolchain (Xtensa)
+nix/rpi-run.nix           copy a binary to a Raspberry Pi over SSH and run it
+nix/rpi-boot.nix          write a bare-metal kernel + GPU firmware + config.txt for an SD card
 scripts/check-examples.sh build + language-server check of every example
 examples/blink-<board>-<lang>/
   .envrc                  uses this repo's flake locally, the GitHub one otherwise
@@ -152,6 +171,36 @@ examples/blink-<board>-<lang>/
 ```
 
 ## Notes
+
+- **Raspberry Pi (Linux).** The Pi 3, 4, 5 and Zero boards usually run
+  Linux, and the `rpi` shell cross-compiles Linux programs for them. You
+  don't flash them; `rpi-run` copies them over SSH. Pick the target from the
+  Pi's OS, not the board. A 64-bit Raspberry Pi OS (Pi 3, 4, 5, Zero 2 W) uses
+  `aarch64` (preset `default`). The Pi Zero and Zero W (ARMv6), or any Pi on a
+  32-bit OS, use ARMv6 hard-float (preset `armv6`). Binaries are statically
+  linked against musl. A dynamically linked Nix binary would look for its
+  loader in `/nix/store` and need a newer glibc than Raspberry Pi OS has. The
+  examples drive GPIO 17 (header pin 11) through the kernel's GPIO character
+  device, which works on every model, including the Pi 5's RP1. Wire an LED and
+  a resistor from pin 11 to ground. To use C libraries such as libgpiod, they
+  must be cross-built statically for the same target.
+- **Raspberry Pi (bare metal).** In the `rpi-baremetal` shell, your program is
+  the only thing running; no OS needs to be installed. A Pi has no flash to
+  program. Its GPU firmware loads `kernel8.img` (64-bit: Pi 3, 4, 5, Zero 2 W)
+  or `kernel.img` (ARMv6: Pi Zero, Zero W) from a FAT32 SD card and jumps to
+  it with the MMU and caches off. `rpi-boot` turns the ELF into that image. It
+  also adds the firmware files (from nixpkgs' `raspberrypifw`) and a
+  `config.txt`. Use a spare SD card: `rpi-boot` refuses to write to one that
+  boots Linux (it has `cmdline.txt`) unless `RPI_BOOT_FORCE=1` is set. If you
+  build both images onto one card, it boots on every supported Pi. The one
+  `kernel8.img` tells the 64-bit boards apart by CPU type: Cortex-A53 for the
+  Pi 3 and Zero 2 W, A72 for the Pi 4, A76 for the Pi 5. The Pi 5's header
+  GPIO is on the RP1 chip behind PCIe; `config.txt` sets `pciex4_reset=0` so
+  the bootloader leaves that link up. The 64-bit code avoids FP/SIMD registers
+  (`-mgeneral-regs-only`, Rust's `-softfloat` target), which the firmware may
+  leave trapped. Like the Linux examples, these blink an LED on GPIO 17 (pin
+  11). You can try the Zero, Pi 3 and Pi 4 images in QEMU, for example
+  `qemu-system-aarch64 -M raspi3b -kernel build/boot/kernel8.img`.
 
 - **STM32 HAL.** The STM32 C/C++ examples are register-level, so they need only
   the toolchain. For HAL projects, generate a CMake project in STM32CubeMX

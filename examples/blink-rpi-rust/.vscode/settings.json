@@ -1,0 +1,12 @@
+{
+  // Restart extensions whenever direnv loads the dev shell, so they see its
+  // toolchain on PATH.
+  "direnv.restart.automatic": true,
+  // Use the shell's rust-analyzer: it matches the shell's rustc, so the
+  // standard library sources and proc-macro server line up.
+  "rust-analyzer.server.path": "rust-analyzer",
+  // The target comes from .cargo/config.toml. Only check the binary itself:
+  // tests built for the Pi can't run on this machine.
+  "rust-analyzer.check.allTargets": false,
+  "rust-analyzer.cargo.allTargets": false
+}

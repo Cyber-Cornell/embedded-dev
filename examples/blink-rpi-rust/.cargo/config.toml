@@ -1,0 +1,15 @@
+[build]
+# Pi 3, 4, 5 and Zero 2 W on a 64-bit OS. For the Pi Zero / Zero W (or any Pi
+# on a 32-bit OS): cargo run --release --target arm-unknown-linux-musleabihf
+target = "aarch64-unknown-linux-musl"
+
+# musl targets link statically, so the binary runs on any Raspberry Pi OS
+# release. `cargo run` copies it to $RPI_HOST (default raspberrypi.local) over
+# SSH and runs it there.
+[target.aarch64-unknown-linux-musl]
+linker = "aarch64-unknown-linux-musl-gcc"
+runner = "rpi-run"
+
+[target.arm-unknown-linux-musleabihf]
+linker = "armv6l-unknown-linux-musleabihf-gcc"
+runner = "rpi-run"

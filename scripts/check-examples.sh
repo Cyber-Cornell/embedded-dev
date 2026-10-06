@@ -7,7 +7,7 @@ cd "$(dirname "$0")/../examples"
 
 shell_for() {
   case "$1" in
-    *pico*) echo pico ;; *esp32*) echo esp32 ;; *stm32*) echo stm32 ;; *msp430*) echo ti ;;
+    *pico*) echo pico ;; *esp32*) echo esp32 ;; *stm32*) echo stm32 ;; *msp430*) echo ti ;; *rpi-baremetal*) echo rpi-baremetal ;; *rpi*) echo rpi ;;
   esac
 }
 

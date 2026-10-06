@@ -1,0 +1,14 @@
+[package]
+name = "blink"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "blink"
+test = false
+bench = false
+
+[profile.release]
+debug = 2
+lto = true
+opt-level = "s"

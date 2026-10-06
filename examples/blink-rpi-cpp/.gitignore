@@ -1,0 +1,4 @@
+build/
+build-armv6/
+.direnv/
+.cache/

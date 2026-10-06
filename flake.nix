@@ -1,5 +1,5 @@
 {
-  description = "Per-target embedded C/C++/Rust dev shells (RP2040/RP2350, ESP32, STM32, TI MSP430)";
+  description = "Per-target embedded C/C++/Rust dev shells (RP2040/RP2350, ESP32, STM32, TI MSP430, Raspberry Pi Linux and bare metal)";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -42,6 +42,8 @@
           msp430-gcc = pkgs.callPackage ./nix/msp430-gcc.nix { };
           clangd = pkgs.callPackage ./nix/clangd.nix { };
           esp-rust = pkgs.callPackage ./nix/esp-rust.nix { };
+          rpi-run = pkgs.callPackage ./nix/rpi-run.nix { };
+          rpi-boot = pkgs.callPackage ./nix/rpi-boot.nix { };
         }
       );
 
@@ -49,7 +51,7 @@
         system:
         let
           pkgs = pkgsFor system;
-          inherit (self.packages.${system}) msp430-gcc clangd esp-rust;
+          inherit (self.packages.${system}) msp430-gcc clangd esp-rust rpi-run rpi-boot;
 
           # Stable Rust for every Cortex-M flavour (RP2040 = thumbv6m,
           # STM32F4 = thumbv7em-hf, RP2350 = thumbv8m.main-hf, ...). Thumb
@@ -68,9 +70,9 @@
             ];
           };
 
-          # msp430-none-elf is a tier-3 target: nightly, core built from source.
-          # Pinned through flake.lock like everything else.
-          rustMsp430 = pkgs.rust-bin.selectLatestNightlyWith (
+          # Tier-3 targets (msp430-none-elf, armv6-none-eabihf): nightly, core
+          # built from source. Pinned through flake.lock like everything else.
+          rustNightly = pkgs.rust-bin.selectLatestNightlyWith (
             toolchain:
             toolchain.default.override {
               extensions = [
@@ -79,6 +81,19 @@
               ];
             }
           );
+
+          # Linux userspace on Raspberry Pi boards. musl targets link statically,
+          # so binaries run on any Raspberry Pi OS (or other distro) release.
+          rustRpi = pkgs.rust-bin.stable.latest.default.override {
+            extensions = [
+              "rust-src"
+              "rust-analyzer"
+            ];
+            targets = [
+              "aarch64-unknown-linux-musl" # Pi 3/4/5, Zero 2 W (64-bit OS)
+              "arm-unknown-linux-musleabihf" # Pi Zero/Zero W, or any Pi on a 32-bit OS (ARMv6 + VFP)
+            ];
+          };
 
           # Tools every target shell gets: build system, editor tooling, serial.
           # (mkShell also provides a host C compiler, which Cargo build scripts
@@ -169,7 +184,37 @@
                 enableMspds = true;
                 mspds = pkgs.mspds-bin; # the source build is broken against current Boost
               })
-              rustMsp430
+              rustNightly
+            ];
+          };
+
+          # Raspberry Pi 3, 4, 5, Zero, Zero W, Zero 2 W (Linux userspace).
+          # Static musl cross compilers: a Nix-built glibc binary would need a
+          # /nix/store dynamic loader and a newer glibc than Raspberry Pi OS has.
+          # ARMv6 hard-float code also runs on every newer Pi with a 32-bit OS.
+          rpi = mkTargetShell {
+            name = "rpi";
+            packages = [
+              pkgs.pkgsCross.aarch64-multiplatform-musl.buildPackages.gcc
+              pkgs.pkgsCross.muslpi.buildPackages.gcc
+              rustRpi
+              rpi-run
+              pkgs.openssh
+            ];
+          };
+
+          # Raspberry Pi 3, 4, 5, Zero, Zero W, Zero 2 W without an OS. The GPU
+          # firmware boots kernel8.img (aarch64: Pi 3, 4, 5, Zero 2 W) or
+          # kernel.img (ARMv6: Pi Zero / Zero W) from the SD card; `rpi-boot`
+          # assembles those files. Rust builds core from source for both targets
+          # (armv6-none-eabihf has no prebuilt one).
+          rpi-baremetal = mkTargetShell {
+            name = "rpi-baremetal";
+            packages = [
+              pkgs.pkgsCross.aarch64-embedded.buildPackages.gcc
+              pkgs.gcc-arm-embedded
+              rustNightly
+              rpi-boot
             ];
           };
         }

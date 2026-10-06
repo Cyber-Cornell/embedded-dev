@@ -1,0 +1,16 @@
+[package]
+name = "blink"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+gpiocdev = "0.8"
+
+[[bin]]
+name = "blink"
+test = false
+bench = false
+
+[profile.release]
+lto = true
+strip = true

@@ -1,0 +1,27 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "default",
+      "displayName": "kernel8.img: Pi 3, 4, 5, Zero 2 W (aarch64)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build",
+      "toolchainFile": "${sourceDir}/cmake/aarch64-none-elf.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+    {
+      "name": "armv6",
+      "displayName": "kernel.img: Pi Zero, Zero W (ARMv6)",
+      "inherits": "default",
+      "binaryDir": "${sourceDir}/build-armv6",
+      "toolchainFile": "${sourceDir}/cmake/arm-none-eabi.cmake"
+    }
+  ],
+  "buildPresets": [
+    { "name": "default", "configurePreset": "default" },
+    { "name": "armv6", "configurePreset": "armv6" }
+  ]
+}

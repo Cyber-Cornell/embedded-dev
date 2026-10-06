@@ -1,0 +1,27 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "default",
+      "displayName": "64-bit OS (Pi 3, 4, 5, Zero 2 W)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build",
+      "toolchainFile": "${sourceDir}/cmake/aarch64-linux-musl.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
+    },
+    {
+      "name": "armv6",
+      "displayName": "32-bit OS (Pi Zero, Zero W, or any Pi)",
+      "inherits": "default",
+      "binaryDir": "${sourceDir}/build-armv6",
+      "toolchainFile": "${sourceDir}/cmake/armv6-linux-musleabihf.cmake"
+    }
+  ],
+  "buildPresets": [
+    { "name": "default", "configurePreset": "default" },
+    { "name": "armv6", "configurePreset": "armv6" }
+  ]
+}
