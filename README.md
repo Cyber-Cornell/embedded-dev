@@ -34,11 +34,11 @@ Each example is also a flake template named `<board>-<lang>`:
 ```sh
 mkdir my-project && cd my-project
 nix flake init -t github:Cyber-Cornell/embedded-dev#pico-rust   # e.g. esp32-c, stm32-cpp, msp430-rust
-direnv allow
+direnv allow # Note that you need direnv installed
 code .
 ```
 
-You can also enter a shell by hand with `nix develop github:Cyber-Cornell/embedded-dev#stm32`.
+You can also enter a shell manually (no direnv) with `nix develop github:Cyber-Cornell/embedded-dev#stm32`.
 
 ### Build and flash
 
@@ -50,7 +50,7 @@ cmake --build build --target flash          # stm32 / msp430 examples
 
 # C / C++ (esp32)
 idf.py set-target esp32 && idf.py build
-idf.py -p /dev/ttyUSB0 flash monitor
+idf.py -p /dev/ttyUSB0 flash monitor # Linux user needs to be added to group "dialout"
 
 # Rust (all boards): the runner in .cargo/config.toml flashes the board
 cargo build --release
