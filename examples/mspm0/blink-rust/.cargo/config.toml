@@ -1,0 +1,9 @@
+[build]
+target = "thumbv6m-none-eabi" # Cortex-M0+ (MSPM0)
+
+[target.thumbv6m-none-eabi]
+# Flashes over the LaunchPad's on-board XDS110: `cargo run --release`.
+runner = "probe-rs run --chip MSPM0L2228"
+# interrupt_group.x (from embassy-mspm0) routes the MSPM0's grouped
+# interrupts to their handlers.
+rustflags = ["-C", "link-arg=-Tlink.x", "-C", "link-arg=-Tinterrupt_group.x"]

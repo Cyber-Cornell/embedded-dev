@@ -11,6 +11,7 @@ warnings.
 | `pico` | RP2040 / RP2350 (Pico, Pico W, Pico 2) | arm-none-eabi GCC, pico-sdk (with submodules), picotool, OpenOCD | stable + Cortex-M targets, probe-rs |
 | `esp32` | ESP32, -S2, -S3, -C2, -C3, -C6, -H2, -P4 | ESP-IDF v5.5 (Xtensa + RISC-V GCC, esp-clang, esptool) | Espressif's Xtensa rustc (`espup`'s build), espflash |
 | `stm32` | STM32 and other Cortex-M parts | arm-none-eabi GCC, OpenOCD, stlink, probe-rs | stable + Cortex-M targets |
+| `mspm0` | TI MSPM0 (Cortex-M0+) | arm-none-eabi GCC, TI MSPM0 SDK (DriverLib, device headers, startup files, linker scripts), probe-rs | stable + Cortex-M targets |
 | `ti` | TI MSP430 | TI msp430-elf GCC + device headers/linker scripts, mspdebug | nightly + `rust-src` (`-Zbuild-std`) |
 | `rpi` | Raspberry Pi 3, 4, 5, Zero, Zero W, Zero 2 W (Linux userspace) | static musl GCC for aarch64 and ARMv6 hard-float, `rpi-run` | stable + `aarch64-unknown-linux-musl`, `arm-unknown-linux-musleabihf` |
 | `rpi-baremetal` | Raspberry Pi 3, 4, 5, Zero, Zero W, Zero 2 W (no OS) | aarch64-none-elf + arm-none-eabi GCC, GPU firmware, `rpi-boot` | nightly + `rust-src` (`-Zbuild-std`): `aarch64-unknown-none-softfloat`, `armv6-none-eabihf` |
@@ -22,8 +23,8 @@ compiler (for Cargo build scripts), and a `clangd`, `clang-format`,
 `clang-tidy`, `rustfmt`, `clippy` and `rust-analyzer` that match the shell's
 toolchains.
 
-> TI's Arm-based parts (MSPM0, TM4C/Tiva, MSP432) are plain Cortex-M, so use the
-> `stm32` shell for them.
+> TI's other Arm-based parts (TM4C/Tiva, MSP432) are plain Cortex-M, so use the
+> `stm32` shell for them. MSPM0 has its own shell because it carries TI's SDK.
 
 ## Requirements
 
@@ -53,8 +54,9 @@ shells; you install only the pieces below once per machine.
 
    Log out and back in afterwards; `groups` should list `dialout`.
 4. **USB probes: udev rules,** so `picotool`, `openocd`, `st-flash`,
-   `probe-rs` and `mspdebug` work without `sudo`. The packages ship the rules,
-   except for TI's eZ-FET, whose rule is in [`udev/`](udev/70-ti-msp430.rules).
+   `probe-rs` and `mspdebug` work without `sudo`. The packages ship the rules
+   (OpenOCD's also cover the XDS110 on MSPM0 LaunchPads), except for TI's
+   eZ-FET, whose rule is in [`udev/`](udev/70-ti-msp430.rules).
    - NixOS:
 
      ```nix
@@ -101,6 +103,7 @@ Examples are grouped by system, one folder per board family
 | Raspberry Pi Pico / Pico 2 | `pico` | [pico-sdk](examples/pico/blink-c) | [pico-sdk](examples/pico/blink-cpp) | [rp2040-hal](examples/pico/blink-rust) (Pico) |
 | ESP32 DevKit | `esp32` | [ESP-IDF](examples/esp32/blink-c) | [ESP-IDF](examples/esp32/blink-cpp) | [esp-hal](examples/esp32/blink-rust) |
 | Nucleo-F401RE | `stm32` | [bare metal](examples/stm32/blink-c) | [bare metal](examples/stm32/blink-cpp) | [stm32f4xx-hal](examples/stm32/blink-rust) |
+| LP-MSPM0L2228 LaunchPad | `mspm0` | [DriverLib](examples/mspm0/blink-c) | [DriverLib](examples/mspm0/blink-cpp) | [embassy-mspm0](examples/mspm0/blink-rust) |
 | MSP-EXP430G2ET LaunchPad | `ti` | [msp430.h, Timer_A ISR](examples/msp430/blink-c) | [msp430.h, Timer_A ISR](examples/msp430/blink-cpp) | [msp430g2553 PAC](examples/msp430/blink-rust) |
 | Raspberry Pi 3 / 4 / 5 / Zero (all), Linux | `rpi` | [GPIO uAPI](examples/rpi/blink-c) | [GPIO uAPI](examples/rpi/blink-cpp) | [gpiocdev](examples/rpi/blink-rust) |
 | Raspberry Pi 3 / 4 / 5 / Zero (all), bare metal | `rpi-baremetal` | [registers](examples/rpi-baremetal/blink-c) | [registers](examples/rpi-baremetal/blink-cpp) | [registers](examples/rpi-baremetal/blink-rust) |
@@ -121,6 +124,7 @@ line is active.
 | Raspberry Pi Pico / Pico 2 | [regs](examples/pico/blink-regs-c) | [regs](examples/pico/blink-regs-cpp) | [regs](examples/pico/blink-regs-rust) | `rp2040.ld`, `rp2350.ld` | pico-sdk / cortex-m-rt | commented out |
 | ESP32 DevKit | [regs](examples/esp32/blink-regs-c) | [regs](examples/esp32/blink-regs-cpp) | [regs](examples/esp32/blink-regs-rust) | `esp32.ld` | none | active |
 | Nucleo-F401RE | [bare metal](examples/stm32/blink-c) | [bare metal](examples/stm32/blink-cpp) | [regs](examples/stm32/blink-regs-rust) | `stm32f401re.ld` | none (C/C++) / cortex-m-rt (Rust) | active / commented out |
+| LP-MSPM0L2228 | [regs](examples/mspm0/blink-regs-c) | [regs](examples/mspm0/blink-regs-cpp) | [regs](examples/mspm0/blink-regs-rust) | `mspm0l2228.ld` | none (C/C++) / cortex-m-rt (Rust) | active / commented out |
 | MSP-EXP430G2ET | [msp430.h](examples/msp430/blink-c) | [msp430.h](examples/msp430/blink-cpp) | [regs](examples/msp430/blink-regs-rust) | `msp430g2553.ld` / `msp430g2553_rt.ld` | TI's `-mmcu` script / msp430-rt | commented out |
 | Raspberry Pi (bare metal) | [registers](examples/rpi-baremetal/blink-c) | [registers](examples/rpi-baremetal/blink-cpp) | [registers](examples/rpi-baremetal/blink-rust) | `link64.ld`, `link32.ld` | none | active |
 
@@ -130,13 +134,13 @@ line is active.
   `-Tlink.x` one.
 - **Copied scripts keep their license.** The Pico C/C++ `rp2040.ld` and
   `rp2350.ld` are pico-sdk 2.3.1's default scripts flattened into one file
-  each (BSD-3-Clause). The Rust `rp2040.ld`, `rp2350.ld`, `stm32f401re.ld`
-  and `msp430g2553_rt.ld` are
+  each (BSD-3-Clause). The Rust `rp2040.ld`, `rp2350.ld`, `stm32f401re.ld`,
+  `mspm0l2228.ld` and `msp430g2553_rt.ld` are
   cortex-m-rt's / msp430-rt's `link.x` with the project's `memory.x` pasted in
   (MIT). The MSP430 C/C++ `msp430g2553.ld` is TI's script, unmodified
   (BSD-3-Clause). Each file's header says what was changed. Linked with the
   copy instead of the default, every one of them produces a byte-identical
-  image.
+  image. The STM32 and MSPM0 C/C++ scripts were written for these examples.
 - **Pico and Pico 2.** One project builds for either chip: CMake preset
   `default` (Pico, RP2040) or `pico2` (Pico 2, RP2350), and in Rust the
   `thumbv6m-none-eabi` (default) or `thumbv8m.main-none-eabihf` target. The
@@ -146,6 +150,13 @@ line is active.
   registers. Rust uses cortex-m-rt plus `rp2040-boot2` or its own IMAGE_DEF
   block. Only the RP2350's Arm cores are covered, and the Pico W / Pico 2 W
   LEDs sit behind the wireless chip, so these examples don't blink them.
+- **LP-MSPM0L2228.** The examples blink the blue channel of the RGB LED
+  (LED4, PA23); jumper J4 must be on. Red is PB10 (J5) and green PB9 (J6).
+  The register-level examples don't use the MSPM0 SDK at all; their startup
+  code and linker script are in the project. Don't link anything into the
+  NONMAIN flash at `0x41C00000` (the boot configuration and ROM bootloader
+  settings): a bad write there can lock the chip for good. None of the
+  linker scripts here describe it.
 - **ESP32.** No ESP-IDF at all: the mask ROM loads the image from flash offset
   `0x1000`, where ESP-IDF's second-stage bootloader normally sits, straight
   into IRAM/DRAM. That is exactly where a custom bootloader runs. Flashing it
@@ -167,9 +178,9 @@ You can also enter a shell by hand (no direnv), e.g.
 ### Build and flash
 
 ```sh
-# C / C++ (pico, stm32, msp430)
+# C / C++ (pico, stm32, mspm0, msp430)
 cmake --preset default && cmake --build build
-cmake --build build --target flash          # stm32 / msp430 examples
+cmake --build build --target flash          # stm32 / mspm0 / msp430 examples
 #   pico: hold BOOTSEL, plug in, then  picotool load -x build/blink.uf2
 cmake --preset pico2 && cmake --build build-pico2   # Pico 2: build-pico2/blink.uf2
 
@@ -199,7 +210,7 @@ cargo run --release --target thumbv8m.main-none-eabihf      # pico-regs: Pico 2
 ```
 
 The Rust runners are `picotool` (Pico in BOOTSEL mode), `probe-rs` (Nucleo
-ST-Link), `espflash` (ESP32; `esptool.py` for `esp32-regs-rust`),
+ST-Link, MSPM0 LaunchPad XDS110), `espflash` (ESP32; `esptool.py` for `esp32-regs-rust`),
 `mspdebug tilib` (LaunchPad eZ-FET), `rpi-run` (Raspberry Pi over SSH) and
 `rpi-boot` (Raspberry Pi SD card).
 
@@ -322,6 +333,7 @@ flake.nix                 dev shells, packages, templates, `nix fmt`
 nix/clangd.nix            unwrapped clangd / clang-format / clang-tidy
 nix/mcu.nix               the `mcu` CLI, built from examples/host/python
 nix/msp430-gcc.nix        TI MSP430 GCC + device support files
+nix/mspm0-sdk.nix         TI MSPM0 SDK: DriverLib, device headers, startup files, linker scripts
 nix/esp-rust.nix          Espressif's Rust toolchain (Xtensa)
 nix/rpi-run.nix           copy a binary to a Raspberry Pi over SSH and run it
 nix/rpi-boot.nix          write a bare-metal kernel + GPU firmware + config.txt for an SD card
@@ -329,7 +341,7 @@ udev/                     udev rule for TI's eZ-FET (the other probes' come with
 scripts/check-examples.sh build, lint, format and language-server check of every example
 scripts/clang-tidy-cross.py  clang-tidy over cross-compiled code (used by check-examples)
 scripts/lint-repo.sh      lint + format check of the repo's own Nix, shell, Python, Markdown
-examples/<system>/        pico, esp32, stm32, msp430, rpi, rpi-baremetal, host
+examples/<system>/        pico, esp32, stm32, mspm0, msp430, rpi, rpi-baremetal, host
 examples/<system>/blink-<lang>/   blink-regs-<lang>/ for the register-level ones
   .envrc                  uses this repo's flake locally, the GitHub one otherwise
   .vscode/                language-server, format-on-save + direnv settings, extension recommendations
@@ -389,7 +401,9 @@ examples/host/python/     uv project + `mcu` CLI (pyproject.toml, uv.lock, src/,
   project's own nixpkgs pin, because ESP-IDF's Python tooling breaks on newer
   nixpkgs. The Rust toolchains come from
   [rust-overlay](https://github.com/oxalica/rust-overlay), and the MSP430
-  nightly is pinned through `flake.lock`.
+  nightly is pinned through `flake.lock`. embassy-mspm0 isn't on crates.io
+  yet, so `mspm0/blink-rust` takes the embassy crates from one pinned git
+  commit.
 - **Updating.** `nix flake update` bumps everything. The MSP430 GCC and Xtensa
-  Rust toolchains are pinned by URL and hash in `nix/`. After updating, run
-  `scripts/check-examples.sh`.
+  Rust toolchains and the MSPM0 SDK are pinned by URL or tag and hash in
+  `nix/`. After updating, run `scripts/check-examples.sh`.

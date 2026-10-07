@@ -1,0 +1,34 @@
+{
+  // Restart extensions (clangd included) whenever direnv loads the dev shell,
+  // so they see the toolchain and the shell's clangd on PATH.
+  "direnv.restart.automatic": true,
+  // Use the clangd from the dev shell; never offer to download another one.
+  "clangd.checkUpdates": false,
+
+  // clangd provides IntelliSense. Microsoft's C/C++ engine is disabled so the
+  // two don't publish conflicting diagnostics.
+  "C_Cpp.intelliSenseEngine": "disabled",
+  // Format on save with clangd, in the style of .clang-format. clangd also
+  // shows the clang-tidy lints configured in .clang-tidy.
+  "[c]": {
+    "editor.defaultFormatter": "llvm-vs-code-extensions.vscode-clangd",
+    "editor.formatOnSave": true
+  },
+  "[cpp]": {
+    "editor.defaultFormatter": "llvm-vs-code-extensions.vscode-clangd",
+    "editor.formatOnSave": true
+  },
+  "clangd.arguments": [
+    // Let clangd run the cross compiler from compile_commands.json to learn
+    // its target, built-in macros and system headers (newlib, CMSIS, ...).
+    "--query-driver=/nix/store/**/bin/*",
+    "--compile-commands-dir=${workspaceFolder}/build",
+    "--header-insertion=never",
+    "--background-index",
+    "--clang-tidy",
+    "--fallback-style=Google"
+  ],
+  // CMake Tools drives the build via CMakePresets.json (no kit selection).
+  "cmake.useCMakePresets": "always",
+  "cmake.configureOnOpen": true
+}

@@ -1,5 +1,5 @@
 {
-  description = "Per-target embedded C/C++/Rust dev shells (RP2040/RP2350, ESP32, STM32, TI MSP430, Raspberry Pi Linux and bare metal), plus a Python shell for host-side tools";
+  description = "Per-target embedded C/C++/Rust dev shells (RP2040/RP2350, ESP32, STM32, TI MSPM0, TI MSP430, Raspberry Pi Linux and bare metal), plus a Python shell for host-side tools";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -40,6 +40,7 @@
         in
         {
           msp430-gcc = pkgs.callPackage ./nix/msp430-gcc.nix { };
+          mspm0-sdk = pkgs.callPackage ./nix/mspm0-sdk.nix { };
           clangd = pkgs.callPackage ./nix/clangd.nix { };
           esp-rust = pkgs.callPackage ./nix/esp-rust.nix { };
           rpi-run = pkgs.callPackage ./nix/rpi-run.nix { };
@@ -57,6 +58,7 @@
           pkgs = pkgsFor system;
           inherit (self.packages.${system})
             msp430-gcc
+            mspm0-sdk
             clangd
             esp-rust
             rpi-run
@@ -175,7 +177,7 @@
             ];
           };
 
-          # STM32 (and any other Cortex-M part: TI MSPM0/TM4C, nRF, SAMD, ...).
+          # STM32 (and any other Cortex-M part: TI TM4C, nRF, SAMD, ...).
           stm32 = mkTargetShell {
             name = "stm32";
             packages = with pkgs; [
@@ -185,6 +187,20 @@
               probe-rs-tools
               rustCortexM
             ];
+          };
+
+          # TI MSPM0 (Cortex-M0+; LaunchPads such as LP-MSPM0L2228). The SDK
+          # supplies device headers, DriverLib, startup files and linker
+          # scripts; probe-rs flashes through the LaunchPad's XDS110 (OpenOCD
+          # 0.12 has no MSPM0 flash driver).
+          mspm0 = mkTargetShell {
+            name = "mspm0";
+            packages = with pkgs; [
+              gcc-arm-embedded
+              probe-rs-tools
+              rustCortexM
+            ];
+            env.MSPM0_SDK_PATH = "${mspm0-sdk}";
           };
 
           # TI MSP430 (LaunchPads such as MSP-EXP430G2ET, MSP-EXP430FR2433).

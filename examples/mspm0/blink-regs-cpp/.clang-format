@@ -1,0 +1,2 @@
+# Code style for clang-format and clangd's format-on-save.
+BasedOnStyle: Google
