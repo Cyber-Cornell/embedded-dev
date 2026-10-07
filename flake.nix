@@ -1,5 +1,5 @@
 {
-  description = "Per-target embedded C/C++/Rust dev shells (RP2040/RP2350, ESP32, STM32, TI MSP430, Raspberry Pi Linux and bare metal)";
+  description = "Per-target embedded C/C++/Rust dev shells (RP2040/RP2350, ESP32, STM32, TI MSP430, Raspberry Pi Linux and bare metal), plus a Python shell for host-side tools";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -21,7 +21,7 @@
     }:
     let
       systems = [ "x86_64-linux" ];
-      forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f system);
+      forAllSystems = nixpkgs.lib.genAttrs systems;
 
       pkgsFor =
         system:
@@ -44,14 +44,25 @@
           esp-rust = pkgs.callPackage ./nix/esp-rust.nix { };
           rpi-run = pkgs.callPackage ./nix/rpi-run.nix { };
           rpi-boot = pkgs.callPackage ./nix/rpi-boot.nix { };
+          mcu = pkgs.callPackage ./nix/mcu.nix { };
         }
       );
+
+      # `nix fmt` formats the Nix files.
+      formatter = forAllSystems (system: (pkgsFor system).nixfmt);
 
       devShells = forAllSystems (
         system:
         let
           pkgs = pkgsFor system;
-          inherit (self.packages.${system}) msp430-gcc clangd esp-rust rpi-run rpi-boot;
+          inherit (self.packages.${system})
+            msp430-gcc
+            clangd
+            esp-rust
+            rpi-run
+            rpi-boot
+            mcu
+            ;
 
           # Stable Rust for every Cortex-M flavour (RP2040 = thumbv6m,
           # STM32F4 = thumbv7em-hf, RP2350 = thumbv8m.main-hf, ...). Thumb
@@ -95,7 +106,8 @@
             ];
           };
 
-          # Tools every target shell gets: build system, editor tooling, serial.
+          # Tools every target shell gets: build system, editor tooling, serial
+          # (`mcu` from examples/host/python, and picocom).
           # (mkShell also provides a host C compiler, which Cargo build scripts
           # need; CMake toolchain files pick the cross compilers explicitly.)
           common = with pkgs; [
@@ -105,6 +117,7 @@
             clangd
             bear # `bear -- make` produces compile_commands.json for Makefile projects
             picocom
+            mcu
             python3
           ];
 
@@ -217,16 +230,66 @@
               rpi-boot
             ];
           };
+
+          # Working on this repo itself: formatters and linters for its Nix,
+          # shell, Python and Markdown files (scripts/lint-repo.sh runs them).
+          default = pkgs.mkShell {
+            name = "embedded-dev";
+            packages = with pkgs; [
+              nixfmt
+              nil
+              statix
+              shellcheck
+              ruff
+              markdownlint-cli2
+            ];
+          };
+
+          # Host-side Python: tools that talk to the boards, scripts, crypto.
+          # uv manages each project's .venv but uses this Python instead of
+          # downloading its own (those builds don't run on NixOS).
+          host =
+            let
+              python = pkgs.python3;
+            in
+            mkTargetShell {
+              name = "host";
+              packages = [
+                python
+                pkgs.uv
+                pkgs.ruff
+                pkgs.pyright
+              ];
+              env = {
+                UV_PYTHON = "${python}/bin/python3";
+                UV_PYTHON_DOWNLOADS = "never";
+              };
+            };
         }
       );
 
-      # One template per example: `nix flake init -t <this flake>#pico-rust`.
-      templates = nixpkgs.lib.mapAttrs' (
-        dir: _:
-        nixpkgs.lib.nameValuePair (nixpkgs.lib.removePrefix "blink-" dir) {
-          path = ./examples/${dir};
-          description = "Blink example: ${nixpkgs.lib.removePrefix "blink-" dir}";
-        }
-      ) (nixpkgs.lib.filterAttrs (_: type: type == "directory") (builtins.readDir ./examples));
+      # One template per example, named <system>-<example> without "blink-":
+      # examples/pico/blink-regs-c is `nix flake init -t <this flake>#pico-regs-c`,
+      # examples/host/python is #host-python.
+      templates =
+        let
+          inherit (nixpkgs) lib;
+          dirsIn =
+            path: lib.attrNames (lib.filterAttrs (_: type: type == "directory") (builtins.readDir path));
+          example = system: dir: {
+            name = "${system}-${lib.removePrefix "blink-" dir}";
+            value = {
+              path = ./examples/${system}/${dir};
+              description =
+                if lib.hasPrefix "blink-" dir then
+                  "Blink example for ${system}: ${lib.removePrefix "blink-" dir}"
+                else
+                  "Host-side Python project (uv, ruff, pyright, pyserial)";
+            };
+          };
+        in
+        lib.listToAttrs (
+          lib.concatMap (system: map (example system) (dirsIn ./examples/${system})) (dirsIn ./examples)
+        );
     };
 }

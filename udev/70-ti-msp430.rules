@@ -1,0 +1,5 @@
+# TI MSP430 debug probes (eZ-FET on LaunchPads, MSP-FET; USB vendor 0x2047):
+# let the logged-in user run `mspdebug tilib` without sudo. No other package
+# in the dev shells ships rules for them. The probe's backchannel UART is a
+# normal serial port (/dev/ttyACM*), covered by the dialout group.
+SUBSYSTEM=="usb", ATTRS{idVendor}=="2047", MODE="0660", TAG+="uaccess"

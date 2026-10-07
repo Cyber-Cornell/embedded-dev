@@ -1,0 +1,11 @@
+[build]
+target = "thumbv7em-none-eabihf" # Cortex-M4F (STM32F4)
+
+[target.thumbv7em-none-eabihf]
+# Flashes over the Nucleo's on-board ST-Link: `cargo run --release`.
+runner = "probe-rs run --chip STM32F401RETx"
+# cortex-m-rt's link.x, which INCLUDEs memory.x, is the default.
+# stm32f401re.ld is a single-file copy of the two to edit, e.g. to move the
+# program behind a bootloader; to use it, swap the rustflags lines.
+rustflags = ["-C", "link-arg=-Tlink.x"]
+# rustflags = ["-C", "link-arg=-Tstm32f401re.ld"]

@@ -1,0 +1,21 @@
+[build]
+# Pico (RP2040, Cortex-M0+). For the Pico 2 (RP2350, Cortex-M33):
+#   cargo run --release --target thumbv8m.main-none-eabihf
+target = "thumbv6m-none-eabi"
+
+# Hold BOOTSEL while plugging the board in, then `cargo run --release`.
+# With a debug probe instead: runner = "probe-rs run --chip RP2040" / "RP235x"
+#
+# cortex-m-rt's link.x, which INCLUDEs memory.x (picked per chip by build.rs),
+# is the default. rp2040.ld / rp2350.ld are single-file copies of the two to
+# edit, e.g. to move the program behind a bootloader; to use one, swap the two
+# lines under its target.
+[target.thumbv6m-none-eabi]
+runner = "picotool load -u -v -x -t elf"
+rustflags = ["-C", "link-arg=--nmagic", "-C", "link-arg=-Tlink.x"]
+# rustflags = ["-C", "link-arg=--nmagic", "-C", "link-arg=-Trp2040.ld"]
+
+[target.thumbv8m.main-none-eabihf]
+runner = "picotool load -u -v -x -t elf"
+rustflags = ["-C", "link-arg=--nmagic", "-C", "link-arg=-Tlink.x"]
+# rustflags = ["-C", "link-arg=--nmagic", "-C", "link-arg=-Trp2350.ld"]

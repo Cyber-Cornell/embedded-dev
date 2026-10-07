@@ -9,22 +9,23 @@
 #define LED_GPIO 17
 #define BLINK_DELAY_US 500000
 
-#define REG(addr) (*(volatile uint32_t *)(uintptr_t)(addr))
+#define REG(addr) (*(volatile uint32_t*)(uintptr_t)(addr))
 
 // GPIO block of the BCM2835 (Zero), BCM2837 (Pi 3, Zero 2 W) and BCM2711
 // (Pi 4), relative to the SoC's peripheral base.
-#define GPFSEL(base, n) REG((base) + 0x200000 + 4 * (n))
+#define GPFSEL(base, n) REG((base) + 0x200000 + (4 * (uintptr_t)(n)))
 #define GPSET0(base) REG((base) + 0x20001c)
 #define GPCLR0(base) REG((base) + 0x200028)
 
-static uintptr_t gpio_base; // peripheral base of the chip driving the header
+static uintptr_t gpio_base;  // peripheral base of the chip driving the header
 static bool led_on;
 
 static void bcm_gpio_init(uintptr_t peripheral_base) {
   gpio_base = peripheral_base;
   unsigned shift = (LED_GPIO % 10) * 3;
   uint32_t fsel = GPFSEL(gpio_base, LED_GPIO / 10);
-  GPFSEL(gpio_base, LED_GPIO / 10) = (fsel & ~(7u << shift)) | (1u << shift); // 001 = output
+  // Function 001 = output.
+  GPFSEL(gpio_base, LED_GPIO / 10) = (fsel & ~(7u << shift)) | (1u << shift);
 }
 
 static void bcm_gpio_toggle(void) {
@@ -41,10 +42,10 @@ static void bcm_gpio_toggle(void) {
 // Pi 5: the header is wired to the RP1 I/O chip, which the bootloader maps at
 // 0x1f00000000 over PCIe (config.txt keeps the link up with pciex4_reset=0).
 // Its GPIO block works like the RP2040's.
-#define RP1_IO_BANK0 0x1f000d0000ull // per pin: STATUS, CTRL
-#define RP1_SYS_RIO0 0x1f000e0000ull // registered I/O: OUT, OE, IN
+#define RP1_IO_BANK0 0x1f000d0000ull  // per pin: STATUS, CTRL
+#define RP1_SYS_RIO0 0x1f000e0000ull  // registered I/O: OUT, OE, IN
 #define RP1_PADS_BANK0 0x1f000f0000ull
-#define RP1_XOR 0x1000 // atomic register aliases
+#define RP1_XOR 0x1000  // atomic register aliases
 #define RP1_SET 0x2000
 #define RIO_OUT 0x0
 #define RIO_OE 0x4
@@ -55,14 +56,14 @@ static bool is_pi5;
 
 static void rp1_gpio_init(void) {
   is_pi5 = true;
-  REG(RP1_IO_BANK0 + 8 * LED_GPIO + 4) = FUNCSEL_SYS_RIO;
-  REG(RP1_PADS_BANK0 + 4 + 4 * LED_GPIO) &= ~PAD_OUTPUT_DISABLE;
+  REG(RP1_IO_BANK0 + (8ull * LED_GPIO) + 4) = FUNCSEL_SYS_RIO;
+  REG(RP1_PADS_BANK0 + 4 + (4ull * LED_GPIO)) &= ~PAD_OUTPUT_DISABLE;
   REG(RP1_SYS_RIO0 + RP1_SET + RIO_OE) = 1u << LED_GPIO;
 }
 
-#define CORTEX_A53 0xd03 // Pi 3, Zero 2 W (BCM2837)
-#define CORTEX_A72 0xd08 // Pi 4 (BCM2711)
-#define CORTEX_A76 0xd0b // Pi 5 (BCM2712)
+#define CORTEX_A53 0xd03  // Pi 3, Zero 2 W (BCM2837)
+#define CORTEX_A72 0xd08  // Pi 4 (BCM2711)
+#define CORTEX_A76 0xd0b  // Pi 5 (BCM2712)
 
 static unsigned cpu_part(void) {
   uint64_t midr;
@@ -72,15 +73,16 @@ static unsigned cpu_part(void) {
 
 static void led_init(void) {
   switch (cpu_part()) {
-  case CORTEX_A76:
-    rp1_gpio_init();
-    break;
-  case CORTEX_A72:
-    bcm_gpio_init(0xfe000000); // BCM2711 in its default "low peripheral" mode
-    break;
-  default:
-    bcm_gpio_init(0x3f000000);
-    break;
+    case CORTEX_A76:
+      rp1_gpio_init();
+      break;
+    case CORTEX_A72:
+      // BCM2711 in its default "low peripheral" mode
+      bcm_gpio_init(0xfe000000);
+      break;
+    default:
+      bcm_gpio_init(0x3f000000);
+      break;
   }
 }
 
@@ -102,15 +104,17 @@ static uint64_t counter(void) {
 static void delay_us(uint32_t us) {
   uint64_t freq;
   __asm__ volatile("mrs %0, cntfrq_el0" : "=r"(freq));
-  uint64_t start = counter(), ticks = freq * us / 1000000;
+  const uint64_t start = counter();
+  const uint64_t ticks = freq * us / 1000000;
   while (counter() - start < ticks) {
   }
 }
 
-#else // ARMv6: Pi Zero / Zero W (BCM2835)
+#else  // ARMv6: Pi Zero / Zero W (BCM2835)
 
 #define PERIPHERAL_BASE 0x20000000u
-#define SYSTIMER_CLO REG(PERIPHERAL_BASE + 0x3004) // free-running 1 MHz counter
+// Free-running 1 MHz counter.
+#define SYSTIMER_CLO REG(PERIPHERAL_BASE + 0x3004)
 
 static void led_init(void) { bcm_gpio_init(PERIPHERAL_BASE); }
 static void led_toggle(void) { bcm_gpio_toggle(); }

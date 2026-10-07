@@ -1,0 +1,36 @@
+{
+  // For working on the repo itself; open an example folder to work on it.
+  "direnv.restart.automatic": true,
+
+  // Nix: nil for diagnostics, nixfmt on save (both from the default shell).
+  "nix.enableLanguageServer": true,
+  "nix.serverPath": "nil",
+  "nix.serverSettings": {
+    "nil": { "formatting": { "command": ["nixfmt"] } }
+  },
+  "[nix]": {
+    "editor.defaultFormatter": "jnoortheen.nix-ide",
+    "editor.formatOnSave": true
+  },
+
+  // Markdown: markdownlint (rules in .markdownlint.jsonc), fixed on save.
+  "[markdown]": {
+    "editor.defaultFormatter": "DavidAnson.vscode-markdownlint",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": { "source.fixAll.markdownlint": "explicit" }
+  },
+
+  // Python helpers in scripts/: Ruff, from the default shell.
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll": "explicit",
+      "source.organizeImports": "explicit"
+    }
+  },
+  "ruff.path": ["${workspaceFolder}/.direnv/bin/ruff"],
+
+  // Shell scripts: ShellCheck, from the default shell.
+  "shellcheck.executablePath": "${workspaceFolder}/.direnv/bin/shellcheck"
+}

@@ -1,0 +1,24 @@
+[package]
+name = "blink"
+version = "0.1.0"
+edition = "2024"
+
+# Register-level: no HAL or PAC. cortex-m-rt provides the vector table, reset
+# handler and default linker script (link.x + memory.x).
+[dependencies]
+cortex-m-rt = "0.7"
+
+# Pico (RP2040) only: the second-stage bootloader blob. The Pico 2 (RP2350)
+# boot ROM sets up flash itself.
+[target.thumbv6m-none-eabi.dependencies]
+rp2040-boot2 = "0.3"
+
+[[bin]]
+name = "blink"
+test = false
+bench = false
+
+[profile.release]
+debug = 2
+lto = true
+opt-level = "s"

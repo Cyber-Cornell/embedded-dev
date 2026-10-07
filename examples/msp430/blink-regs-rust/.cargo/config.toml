@@ -1,0 +1,23 @@
+[build]
+target = "msp430-none-elf"
+
+[target.msp430-none-elf]
+# eZ-FET LaunchPads: `cargo run --release`. Older G2 LaunchPads: rf2500.
+runner = "mspdebug tilib prog"
+# Links with msp430-elf-gcc from the `ti` shell (the target's default linker).
+# msp430-rt's link.x, which INCLUDEs memory.x, is the default.
+# msp430g2553_rt.ld is a single-file copy of the two to edit, e.g. to move the
+# program behind a bootloader; to use it, swap the -T lines. (It is not TI's
+# msp430g2553.ld, which is for C programs using TI's startup code.)
+rustflags = [
+    "-C", "link-arg=-nostartfiles",
+    "-C", "link-arg=-Tlink.x",
+    # "-C", "link-arg=-Tmsp430g2553_rt.ld",
+    "-C", "link-arg=-mcpu=msp430",
+    "-C", "link-arg=-lmul_none",
+    "-C", "link-arg=-lgcc",
+]
+
+[unstable]
+# msp430-none-elf is a tier-3 target without a prebuilt core library.
+build-std = ["core"]

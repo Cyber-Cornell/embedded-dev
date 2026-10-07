@@ -16,7 +16,7 @@ constexpr auto kBlinkPeriod = 500ms;
 constexpr const char *kTag = "blink";
 
 class Led {
-public:
+ public:
   explicit Led(gpio_num_t pin) : pin_(pin) {
     gpio_reset_pin(pin_);
     gpio_set_direction(pin_, GPIO_MODE_OUTPUT);
@@ -28,12 +28,12 @@ public:
     ESP_LOGI(kTag, "LED %s", on_ ? "on" : "off");
   }
 
-private:
+ private:
   gpio_num_t pin_;
   bool on_ = false;
 };
 
-} // namespace
+}  // namespace
 
 // ESP-IDF calls app_main with C linkage.
 extern "C" void app_main() {

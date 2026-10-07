@@ -49,7 +49,11 @@ impl BcmGpioPin {
         let fsel = base + 4 * (pin as usize / 10);
         let shift = (pin % 10) * 3;
         write_reg(fsel, (read_reg(fsel) & !(7 << shift)) | (1 << shift)); // 001 = output
-        Self { base, pin, on: false }
+        Self {
+            base,
+            pin,
+            on: false,
+        }
     }
 }
 

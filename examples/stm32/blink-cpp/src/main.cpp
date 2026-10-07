@@ -6,26 +6,28 @@
 namespace {
 
 struct GpioRegs {
-  volatile std::uint32_t MODER, OTYPER, OSPEEDR, PUPDR, IDR, ODR, BSRR, LCKR, AFR[2];
+  volatile std::uint32_t MODER, OTYPER, OSPEEDR, PUPDR, IDR, ODR, BSRR, LCKR,
+      AFR[2];
 };
 
 constexpr std::uintptr_t kRccAhb1Enr = 0x40023830;
 constexpr std::uintptr_t kGpioABase = 0x40020000;
 
-inline GpioRegs &gpioA() { return *reinterpret_cast<GpioRegs *>(kGpioABase); }
+inline GpioRegs& gpioA() { return *reinterpret_cast<GpioRegs*>(kGpioABase); }
 
-template <unsigned Pin> class OutputPin {
+template <unsigned Pin>
+class OutputPin {
   static_assert(Pin < 16, "GPIO ports have 16 pins");
 
-public:
-  explicit OutputPin(GpioRegs &port) : port_(port) {
+ public:
+  explicit OutputPin(GpioRegs& port) : port_(port) {
     port_.MODER = (port_.MODER & ~(3u << (Pin * 2))) | (1u << (Pin * 2));
   }
 
   void toggle() { port_.ODR = port_.ODR ^ (1u << Pin); }
 
-private:
-  GpioRegs &port_;
+ private:
+  GpioRegs& port_;
 };
 
 void delay(std::uint32_t count) {
@@ -33,10 +35,11 @@ void delay(std::uint32_t count) {
   }
 }
 
-} // namespace
+}  // namespace
 
 int main() {
-  *reinterpret_cast<volatile std::uint32_t *>(kRccAhb1Enr) |= 1u << 0; // GPIOA clock
+  // GPIOA clock enable.
+  *reinterpret_cast<volatile std::uint32_t*>(kRccAhb1Enr) |= 1u << 0;
 
   OutputPin<5> led(gpioA());
   for (;;) {

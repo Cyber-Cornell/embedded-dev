@@ -1,0 +1,4 @@
+{
+  // Wrap prose at 80 columns; tables and code blocks may run longer.
+  "MD013": { "line_length": 80, "tables": false, "code_blocks": false }
+}

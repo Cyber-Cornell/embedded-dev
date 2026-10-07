@@ -1,0 +1,24 @@
+[package]
+name = "blink"
+version = "0.1.0"
+edition = "2024"
+
+# Register-level: no PAC. msp430-rt provides the reset handler (stack, .data,
+# .bss setup) and the default linker script (link.x + memory.x).
+[dependencies]
+msp430-rt = "0.4"
+
+[[bin]]
+name = "blink"
+test = false
+bench = false
+
+[profile.dev]
+# The G2553 has 16 KiB of flash; unoptimised Rust doesn't fit comfortably.
+opt-level = "s"
+
+[profile.release]
+debug = 2
+lto = "fat"
+codegen-units = 1
+opt-level = "s"

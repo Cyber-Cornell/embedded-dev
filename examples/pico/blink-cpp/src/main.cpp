@@ -11,8 +11,8 @@ constexpr uint32_t kBlinkDelayMs = 500;
 // Hides whether the board's LED is a plain GPIO (Pico, Pico 2) or sits behind
 // the CYW43 wireless chip (Pico W, Pico 2 W).
 class Led {
-public:
-  bool init() {
+ public:
+  static bool init() {
 #if defined(PICO_DEFAULT_LED_PIN)
     gpio_init(PICO_DEFAULT_LED_PIN);
     gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
@@ -35,15 +35,15 @@ public:
 
   void toggle() { set(!on_); }
 
-private:
+ private:
   bool on_ = false;
 };
 
-} // namespace
+}  // namespace
 
 int main() {
   Led led;
-  if (!led.init()) {
+  if (!Led::init()) {
     return -1;
   }
 

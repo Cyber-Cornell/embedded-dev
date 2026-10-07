@@ -1,0 +1,9 @@
+{
+  "recommendations": [
+    "mkhl.direnv",
+    "jnoortheen.nix-ide",
+    "DavidAnson.vscode-markdownlint",
+    "charliermarsh.ruff",
+    "timonwong.shellcheck"
+  ]
+}

@@ -9,6 +9,16 @@
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
         "PICO_BOARD": "pico"
+      },
+      "displayName": "Raspberry Pi Pico (RP2040)"
+    },
+    {
+      "name": "pico2",
+      "displayName": "Raspberry Pi Pico 2 (RP2350, Arm)",
+      "inherits": "default",
+      "binaryDir": "${sourceDir}/build-pico2",
+      "cacheVariables": {
+        "PICO_BOARD": "pico2"
       }
     }
   ],
@@ -16,6 +26,10 @@
     {
       "name": "default",
       "configurePreset": "default"
+    },
+    {
+      "name": "pico2",
+      "configurePreset": "pico2"
     }
   ]
 }

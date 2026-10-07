@@ -1,0 +1,22 @@
+[build]
+target = "xtensa-esp32-none-elf" # ESP32 (Xtensa LX6)
+
+[target.xtensa-esp32-none-elf]
+# `cargo run --release` converts the ELF to the ROM's image format and writes
+# it over the second-stage bootloader at 0x1000 (any ESP-IDF app on the board
+# stops booting until you flash an ESP-IDF project again). esptool finds the
+# serial port itself; set ESPPORT, e.g. /dev/ttyUSB0, to pick one.
+runner = [
+    "sh", "-c",
+    'esptool.py --chip esp32 elf2image --flash_mode dio --flash_freq 40m --flash_size 4MB -o "$0.bin" "$0" && esptool.py --chip esp32 ${ESPPORT:+--port=$ESPPORT} write_flash 0x1000 "$0.bin"',
+]
+# Links with xtensa-esp32-elf-gcc from the `esp32` shell (the target's default
+# linker). The ROM loads the program into RAM, so it must be linked by
+# esp32.ld; there is no default script to fall back on.
+rustflags = ["-C", "link-arg=-nostartfiles", "-C", "link-arg=-Tesp32.ld"]
+
+[unstable]
+# There is no prebuilt core library for Xtensa; build it from rust-src, plus
+# memcpy/memset since there's no libc.
+build-std = ["core"]
+build-std-features = ["compiler-builtins-mem"]

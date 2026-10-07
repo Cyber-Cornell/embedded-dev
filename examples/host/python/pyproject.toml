@@ -1,0 +1,46 @@
+[project]
+name = "mcu-tool"
+version = "0.1.0"
+description = "Host-side tools for talking to a microcontroller over a serial port"
+requires-python = ">=3.11"
+dependencies = ["pyserial>=3.5"]
+
+[project.scripts]
+mcu = "mcu_tool.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8", "types-pyserial"]
+# For host-side crypto tooling: signing and verifying firmware images,
+# deriving keys, talking to secure bootloaders, ...
+crypto = ["cryptography>=43"]
+
+[tool.uv]
+default-groups = ["dev", "crypto"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff.lint]
+select = [
+  "E", "W", # pycodestyle
+  "F",      # pyflakes
+  "I",      # import sorting
+  "N",      # naming
+  "B",      # bugbear
+  "UP",     # pyupgrade
+  "SIM",    # simplify
+  "C4",     # comprehensions
+  "RET",    # return statements
+  "PTH",    # pathlib
+  "PT",     # pytest style
+  "RUF",    # ruff-specific
+]
+
+[tool.pyright]
+typeCheckingMode = "standard"
+venvPath = "."
+venv = ".venv"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

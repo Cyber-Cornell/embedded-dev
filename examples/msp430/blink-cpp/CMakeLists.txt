@@ -13,6 +13,10 @@ target_compile_options(blink.elf PRIVATE -mmcu=${MCU} -Wall -Wextra -ffunction-s
   -fno-exceptions -fno-rtti -fno-threadsafe-statics)
 target_link_options(blink.elf PRIVATE -mmcu=${MCU} -Wl,--gc-sections)
 
+# -mmcu links with TI's default script for the part. msp430g2553.ld is a copy
+# of it to edit, e.g. to move the program behind a bootloader; uncomment to use it.
+# target_link_options(blink.elf PRIVATE -T${CMAKE_CURRENT_SOURCE_DIR}/msp430g2553.ld)
+
 add_custom_command(TARGET blink.elf POST_BUILD COMMAND ${CMAKE_SIZE} blink.elf)
 
 # `cmake --build build --target flash`. The eZ-FET on current LaunchPads

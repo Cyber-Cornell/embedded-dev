@@ -1,8 +1,10 @@
 # embedded-dev
 
-Reproducible Nix dev shells for embedded targets in C, C++ and Rust. VS Code's
-language servers understand each cross toolchain, so you don't get false
-"header not found" or "undeclared identifier" warnings.
+Reproducible Nix dev shells for embedded targets in C, C++ and Rust, plus a
+Python shell for host-side tools. VS Code's language servers understand each
+cross toolchain, so you don't get false "header not found" or "undeclared
+identifier" warnings, and every example formats on save and shows lint
+warnings.
 
 | Shell | Targets | C / C++ | Rust |
 | --- | --- | --- | --- |
@@ -12,37 +14,155 @@ language servers understand each cross toolchain, so you don't get false
 | `ti` | TI MSP430 | TI msp430-elf GCC + device headers/linker scripts, mspdebug | nightly + `rust-src` (`-Zbuild-std`) |
 | `rpi` | Raspberry Pi 3, 4, 5, Zero, Zero W, Zero 2 W (Linux userspace) | static musl GCC for aarch64 and ARMv6 hard-float, `rpi-run` | stable + `aarch64-unknown-linux-musl`, `arm-unknown-linux-musleabihf` |
 | `rpi-baremetal` | Raspberry Pi 3, 4, 5, Zero, Zero W, Zero 2 W (no OS) | aarch64-none-elf + arm-none-eabi GCC, GPU firmware, `rpi-boot` | nightly + `rust-src` (`-Zbuild-std`): `aarch64-unknown-none-softfloat`, `armv6-none-eabihf` |
+| `host` | Your computer: tools that talk to the boards | — | — (Python 3, uv, Ruff, Pyright) |
 
-Every shell also has `cmake`, `ninja`, `make`, `bear`, `picocom`, `python3`, a
-host C compiler (for Cargo build scripts), a `clangd` and a `rust-analyzer` that
-match the shell's toolchains.
+Every shell also has `cmake`, `ninja`, `make`, `bear`, `picocom`, `python3`,
+[`mcu`](#host-side-python-and-the-mcu-cli) (a serial-port CLI), a host C
+compiler (for Cargo build scripts), and a `clangd`, `clang-format`,
+`clang-tidy`, `rustfmt`, `clippy` and `rust-analyzer` that match the shell's
+toolchains.
 
 > TI's Arm-based parts (MSPM0, TM4C/Tiva, MSP432) are plain Cortex-M, so use the
 > `stm32` shell for them.
 
+## Requirements
+
+Linux on x86-64. Everything else that builds or flashes comes from the dev
+shells; you install only the pieces below once per machine.
+
+1. **Nix with flakes.**
+   - NixOS: add `nix.settings.experimental-features = [ "nix-command" "flakes" ];`
+     to `configuration.nix`.
+   - Other distributions: install Nix, e.g. with
+     `sh <(curl -L https://nixos.org/nix/install) --daemon`, then enable flakes
+     with `experimental-features = nix-command flakes` in
+     `~/.config/nix/nix.conf`.
+2. **direnv with nix-direnv**, which loads a project's shell when you `cd`
+   into it (and into VS Code, through the direnv extension).
+   - NixOS: `programs.direnv.enable = true;` (includes nix-direnv).
+   - Other distributions: install direnv from the package manager, add its
+     hook to your shell (`eval "$(direnv hook bash)"` in `~/.bashrc`, or the
+     `zsh` equivalent), then `nix profile install nixpkgs#nix-direnv` and put
+     `source $HOME/.nix-profile/share/nix-direnv/direnvrc` in
+     `~/.config/direnv/direnvrc`.
+3. **Serial ports: be in the `dialout` group.** Board consoles, the ESP32's
+   USB-UART and `mcu`/`picocom`/`idf.py monitor` all open `/dev/ttyUSB*` or
+   `/dev/ttyACM*`, which belong to `dialout` (`uucp` on Arch).
+   - NixOS: `users.users.<you>.extraGroups = [ "dialout" ];`
+   - Other distributions: `sudo usermod -aG dialout $USER`.
+
+   Log out and back in afterwards; `groups` should list `dialout`.
+4. **USB probes: udev rules,** so `picotool`, `openocd`, `st-flash`,
+   `probe-rs` and `mspdebug` work without `sudo`. The packages ship the rules,
+   except for TI's eZ-FET, whose rule is in [`udev/`](udev/70-ti-msp430.rules).
+   - NixOS:
+
+     ```nix
+     services.udev.packages = with pkgs; [ picotool openocd stlink probe-rs-tools ];
+     services.udev.extraRules = builtins.readFile ./70-ti-msp430.rules; # copy of udev/70-ti-msp430.rules
+     ```
+
+   - Other distributions:
+
+     ```sh
+     for p in picotool openocd stlink probe-rs-tools; do
+       sudo cp "$(nix build --no-link --print-out-paths nixpkgs#$p)"/{etc,lib}/udev/rules.d/*.rules /etc/udev/rules.d/ 2>/dev/null
+     done
+     sudo cp udev/70-ti-msp430.rules /etc/udev/rules.d/
+     sudo udevadm control --reload && sudo udevadm trigger
+     ```
+
+5. **VS Code** with the extensions the example recommends when you open it:
+   - `mkhl.direnv`: loads the dev shell into VS Code. Required.
+   - `llvm-vs-code-extensions.vscode-clangd`: C/C++ IntelliSense, formatting
+     and clang-tidy.
+   - `rust-lang.rust-analyzer`: Rust IntelliSense, rustfmt and clippy.
+   - `ms-python.python`, `ms-python.vscode-pylance`, `charliermarsh.ruff`:
+     Python (the `host-python` example).
+   - `ms-vscode.cmake-tools`: optional, for building C/C++ from the editor.
+   - `marus25.cortex-debug` / `probe-rs.probe-rs-debugger`: optional, for
+     debugging.
+
+   The C/C++ examples turn off Microsoft's C/C++ IntelliSense engine
+   (`ms-vscode.cpptools`) for the workspace, so it doesn't duplicate or
+   contradict clangd.
+
+The ESP-IDF toolchains are large: the `esp32` shell downloads a few GB the
+first time.
+
 ## Examples / templates
 
-Every board has a blink example in each language, under `examples/blink-<board>-<lang>`:
+Examples are grouped by system, one folder per board family
+(`examples/<system>/`), and every board has a blink example in each language
+(`examples/<system>/blink-<lang>`):
 
 | Board | Shell | C | C++ | Rust |
 | --- | --- | --- | --- | --- |
-| Raspberry Pi Pico | `pico` | [pico-sdk](examples/blink-pico-c) | [pico-sdk](examples/blink-pico-cpp) | [rp2040-hal](examples/blink-pico-rust) |
-| ESP32 DevKit | `esp32` | [ESP-IDF](examples/blink-esp32-c) | [ESP-IDF](examples/blink-esp32-cpp) | [esp-hal](examples/blink-esp32-rust) |
-| Nucleo-F401RE | `stm32` | [bare metal](examples/blink-stm32-c) | [bare metal](examples/blink-stm32-cpp) | [stm32f4xx-hal](examples/blink-stm32-rust) |
-| MSP-EXP430G2ET LaunchPad | `ti` | [msp430.h, Timer_A ISR](examples/blink-msp430-c) | [msp430.h, Timer_A ISR](examples/blink-msp430-cpp) | [msp430g2553 PAC](examples/blink-msp430-rust) |
-| Raspberry Pi 3 / 4 / 5 / Zero (all), Linux | `rpi` | [GPIO uAPI](examples/blink-rpi-c) | [GPIO uAPI](examples/blink-rpi-cpp) | [gpiocdev](examples/blink-rpi-rust) |
-| Raspberry Pi 3 / 4 / 5 / Zero (all), bare metal | `rpi-baremetal` | [registers](examples/blink-rpi-baremetal-c) | [registers](examples/blink-rpi-baremetal-cpp) | [registers](examples/blink-rpi-baremetal-rust) |
+| Raspberry Pi Pico / Pico 2 | `pico` | [pico-sdk](examples/pico/blink-c) | [pico-sdk](examples/pico/blink-cpp) | [rp2040-hal](examples/pico/blink-rust) (Pico) |
+| ESP32 DevKit | `esp32` | [ESP-IDF](examples/esp32/blink-c) | [ESP-IDF](examples/esp32/blink-cpp) | [esp-hal](examples/esp32/blink-rust) |
+| Nucleo-F401RE | `stm32` | [bare metal](examples/stm32/blink-c) | [bare metal](examples/stm32/blink-cpp) | [stm32f4xx-hal](examples/stm32/blink-rust) |
+| MSP-EXP430G2ET LaunchPad | `ti` | [msp430.h, Timer_A ISR](examples/msp430/blink-c) | [msp430.h, Timer_A ISR](examples/msp430/blink-cpp) | [msp430g2553 PAC](examples/msp430/blink-rust) |
+| Raspberry Pi 3 / 4 / 5 / Zero (all), Linux | `rpi` | [GPIO uAPI](examples/rpi/blink-c) | [GPIO uAPI](examples/rpi/blink-cpp) | [gpiocdev](examples/rpi/blink-rust) |
+| Raspberry Pi 3 / 4 / 5 / Zero (all), bare metal | `rpi-baremetal` | [registers](examples/rpi-baremetal/blink-c) | [registers](examples/rpi-baremetal/blink-cpp) | [registers](examples/rpi-baremetal/blink-rust) |
+
+### Register-level examples and linker scripts
+
+For bootloader work, every bare-metal board also has a register-level blink:
+no HAL, PAC or SDK API, just volatile reads and writes of the peripheral
+registers. Each
+one carries the board's linker script in the project directory. Where the
+toolchain or SDK already supplies a default script, the project's copy is
+referenced from a commented-out line, so the build is unchanged until you
+uncomment it. Where nothing supplies a default, the script is required and its
+line is active.
+
+| Board | C | C++ | Rust | Linker script | Default from | Switch |
+| --- | --- | --- | --- | --- | --- | --- |
+| Raspberry Pi Pico / Pico 2 | [regs](examples/pico/blink-regs-c) | [regs](examples/pico/blink-regs-cpp) | [regs](examples/pico/blink-regs-rust) | `rp2040.ld`, `rp2350.ld` | pico-sdk / cortex-m-rt | commented out |
+| ESP32 DevKit | [regs](examples/esp32/blink-regs-c) | [regs](examples/esp32/blink-regs-cpp) | [regs](examples/esp32/blink-regs-rust) | `esp32.ld` | none | active |
+| Nucleo-F401RE | [bare metal](examples/stm32/blink-c) | [bare metal](examples/stm32/blink-cpp) | [regs](examples/stm32/blink-regs-rust) | `stm32f401re.ld` | none (C/C++) / cortex-m-rt (Rust) | active / commented out |
+| MSP-EXP430G2ET | [msp430.h](examples/msp430/blink-c) | [msp430.h](examples/msp430/blink-cpp) | [regs](examples/msp430/blink-regs-rust) | `msp430g2553.ld` / `msp430g2553_rt.ld` | TI's `-mmcu` script / msp430-rt | commented out |
+| Raspberry Pi (bare metal) | [registers](examples/rpi-baremetal/blink-c) | [registers](examples/rpi-baremetal/blink-cpp) | [registers](examples/rpi-baremetal/blink-rust) | `link64.ld`, `link32.ld` | none | active |
+
+- **Switching.** C/C++: uncomment the line in `CMakeLists.txt`
+  (`pico_set_linker_script` for the Pico, `-T` for the MSP430). Rust: in
+  `.cargo/config.toml`, swap the commented `-T` line with the active
+  `-Tlink.x` one.
+- **Copied scripts keep their license.** The Pico C/C++ `rp2040.ld` and
+  `rp2350.ld` are pico-sdk 2.3.1's default scripts flattened into one file
+  each (BSD-3-Clause). The Rust `rp2040.ld`, `rp2350.ld`, `stm32f401re.ld`
+  and `msp430g2553_rt.ld` are
+  cortex-m-rt's / msp430-rt's `link.x` with the project's `memory.x` pasted in
+  (MIT). The MSP430 C/C++ `msp430g2553.ld` is TI's script, unmodified
+  (BSD-3-Clause). Each file's header says what was changed. Linked with the
+  copy instead of the default, every one of them produces a byte-identical
+  image.
+- **Pico and Pico 2.** One project builds for either chip: CMake preset
+  `default` (Pico, RP2040) or `pico2` (Pico 2, RP2350), and in Rust the
+  `thumbv6m-none-eabi` (default) or `thumbv8m.main-none-eabihf` target. The
+  register addresses, reset bits and linker script follow the chip. In C/C++
+  the SDK still provides the boot path (RP2040 boot2, the RP2350 IMAGE_DEF
+  block), crt0 and clock setup (`pico_runtime`), while `main` touches only
+  registers. Rust uses cortex-m-rt plus `rp2040-boot2` or its own IMAGE_DEF
+  block. Only the RP2350's Arm cores are covered, and the Pico W / Pico 2 W
+  LEDs sit behind the wireless chip, so these examples don't blink them.
+- **ESP32.** No ESP-IDF at all: the mask ROM loads the image from flash offset
+  `0x1000`, where ESP-IDF's second-stage bootloader normally sits, straight
+  into IRAM/DRAM. That is exactly where a custom bootloader runs. Flashing it
+  replaces the board's second-stage bootloader, so ESP-IDF apps won't boot
+  until you flash an ESP-IDF project again.
 
 Each example is also a flake template named `<board>-<lang>`:
 
 ```sh
 mkdir my-project && cd my-project
-nix flake init -t github:Cyber-Cornell/embedded-dev#pico-rust   # e.g. esp32-c, stm32-cpp, msp430-rust
-direnv allow # Note that you need direnv installed
+nix flake init -t github:Cyber-Cornell/embedded-dev#pico-rust   # e.g. esp32-c, pico-regs-c, host-python
+direnv allow
 code .
 ```
 
-You can also enter a shell manually (no direnv) with `nix develop github:Cyber-Cornell/embedded-dev#stm32`.
+You can also enter a shell by hand (no direnv), e.g.
+`nix develop github:Cyber-Cornell/embedded-dev#stm32`.
 
 ### Build and flash
 
@@ -51,6 +171,7 @@ You can also enter a shell manually (no direnv) with `nix develop github:Cyber-C
 cmake --preset default && cmake --build build
 cmake --build build --target flash          # stm32 / msp430 examples
 #   pico: hold BOOTSEL, plug in, then  picotool load -x build/blink.uf2
+cmake --preset pico2 && cmake --build build-pico2   # Pico 2: build-pico2/blink.uf2
 
 # C / C++ (rpi): copies the binary to the Pi over SSH and runs it there
 export RPI_HOST=user@raspberrypi.local       # the default host is raspberrypi.local
@@ -66,39 +187,70 @@ cmake --preset armv6 && cmake --build build-armv6 --target flash        # kernel
 idf.py set-target esp32 && idf.py build
 idf.py -p /dev/ttyUSB0 flash monitor # Linux user needs to be added to group "dialout"
 
+# C / C++ (esp32-regs): no ESP-IDF; writes build/blink.bin to flash offset 0x1000
+cmake --preset default && cmake --build build --target flash   # ESPPORT=/dev/ttyUSB0 to pick a port
+
 # Rust (all boards): the runner in .cargo/config.toml flashes the board
 cargo build --release
 cargo run --release
 cargo run --release --target arm-unknown-linux-musleabihf   # rpi: Zero / Zero W, 32-bit OS
 cargo run --release --target armv6-none-eabihf              # rpi-baremetal: Zero / Zero W
+cargo run --release --target thumbv8m.main-none-eabihf      # pico-regs: Pico 2
 ```
 
 The Rust runners are `picotool` (Pico in BOOTSEL mode), `probe-rs` (Nucleo
-ST-Link), `espflash` (ESP32), `mspdebug tilib` (LaunchPad eZ-FET) and
-`rpi-run` (Raspberry Pi over SSH) and `rpi-boot` (Raspberry Pi SD card).
+ST-Link), `espflash` (ESP32; `esptool.py` for `esp32-regs-rust`),
+`mspdebug tilib` (LaunchPad eZ-FET), `rpi-run` (Raspberry Pi over SSH) and
+`rpi-boot` (Raspberry Pi SD card).
 
-## One-time setup (NixOS)
+## Host-side Python and the `mcu` CLI
 
-```nix
-# configuration.nix
-programs.direnv.enable = true;          # auto-load shells on `cd` (includes nix-direnv)
-services.udev.packages = with pkgs; [   # USB access to probes without sudo
-  picotool openocd stlink probe-rs-tools
-];
-users.users.<you>.extraGroups = [ "dialout" ];  # serial ports
+The `host` shell is for Python that runs on your computer: tools that talk to
+a board, test scripts, image signing and other crypto. It has Python 3, uv,
+Ruff and Pyright. [`examples/host/python`](examples/host/python) is a uv
+project to start from (template `host-python`): its `.envrc` loads the shell
+and runs `uv sync`, which creates `.venv` from `uv.lock` with pyserial,
+cryptography and pytest.
+
+```sh
+uv add requests          # add a dependency (updates pyproject.toml and uv.lock)
+uv run pytest            # tests
+ruff check --fix . && ruff format . && pyright
 ```
 
-VS Code extensions (each example recommends the ones it needs):
+uv uses the shell's Python (`UV_PYTHON`) and never downloads its own, because
+those builds don't run on NixOS.
 
-- `mkhl.direnv`: loads the dev shell into VS Code. Required.
-- `llvm-vs-code-extensions.vscode-clangd`: C/C++ IntelliSense.
-- `rust-lang.rust-analyzer`: Rust IntelliSense.
-- `ms-vscode.cmake-tools`: optional, for building C/C++ from the editor.
-- `marus25.cortex-debug` / `probe-rs.probe-rs-debugger`: optional, for debugging.
+The project is also `mcu`, a small CLI for a board on a serial port. Every dev
+shell has it:
 
-The C/C++ examples disable Microsoft's C/C++ IntelliSense engine
-(`ms-vscode.cpptools`) for the workspace, so it doesn't duplicate or contradict
-clangd.
+```sh
+mcu ports                          # list USB serial ports and what's on them
+mcu monitor                        # terminal; -b 9600, -t timestamps, --hex, --log file
+mcu send "status" --expect "OK"    # send a line, print the reply, check it
+mcu send --hex "de ad be ef"       # raw bytes
+mcu bootsel                        # reboot a pico-sdk Pico (USB stdio) into BOOTSEL
+```
+
+With a single board plugged in, `mcu` finds its port; otherwise pass
+`-p /dev/ttyACM0` or set `MCU_PORT`. `-p loop://` is an echo port for trying
+it out without hardware.
+
+## Formatting and linting
+
+Saving a file in VS Code formats it, and lint warnings show up as you type:
+
+| Language | Format on save | Lint | Config |
+| --- | --- | --- | --- |
+| C / C++ | clang-format, through clangd | clang-tidy, through clangd | `.clang-format` (Google style), `.clang-tidy` |
+| Rust | rustfmt, through rust-analyzer | clippy, on save | `rustfmt.toml` / `clippy.toml` if you add them |
+| Python | Ruff | Ruff, Pylance (type checks, like `pyright`) | `pyproject.toml` |
+| Nix, Markdown, shell (this repo) | nixfmt, markdownlint | nil, statix, markdownlint, ShellCheck | `.markdownlint.jsonc` |
+
+The tools come from the dev shell, so everyone gets the same versions. The
+`.clang-tidy` files turn off the checks that fight register-level code
+(integer-to-pointer casts, fixed addresses, linker symbols, magic numbers);
+edit them to taste.
 
 ## How the IntelliSense setup works
 
@@ -139,35 +291,53 @@ exists. After that, clangd resolves pico-sdk, ESP-IDF, HAL and CMSIS headers.
    `rust-analyzer.check.allTargets: false`, stop the "can't find crate for
    `test`" errors that `no_std` firmware otherwise gets.
 
-### Checking for false warnings
+### Checking the examples
 
 [`scripts/check-examples.sh`](scripts/check-examples.sh) builds every example
-(or the ones you name) in its shell. It then runs the language server and clippy
-from the command line, and fails on any diagnostic VS Code would show:
+(or the ones you name) in its shell, both chips for the Pico examples. It then
+runs the language server, the linters (clang-tidy, clippy, Ruff, Pyright) and
+the formatters' check modes from the command line, plus the Python tests. It
+fails on any diagnostic VS Code would show and on any unformatted file:
 
 ```sh
 scripts/check-examples.sh                      # all examples
-scripts/check-examples.sh examples/blink-pico-rust
+scripts/check-examples.sh examples/pico/blink-rust
+scripts/check-examples.sh examples/pico         # every example of one system
 ```
 
 If VS Code still shows stale errors, run **clangd: Restart language server** or
 **rust-analyzer: Restart server**.
 
+## Working on this repo
+
+The repo root has its own shell (`nix develop`, or direnv with the root
+`.envrc`) with nixfmt, nil, statix, ShellCheck, Ruff and markdownlint for the
+repo's Nix, shell, Python and Markdown files. `nix develop -c
+scripts/lint-repo.sh` checks them all, and `nix fmt` formats the Nix files.
+
 ## Layout
 
 ```text
-flake.nix                 dev shells, packages, templates
+flake.nix                 dev shells, packages, templates, `nix fmt`
 nix/clangd.nix            unwrapped clangd / clang-format / clang-tidy
+nix/mcu.nix               the `mcu` CLI, built from examples/host/python
 nix/msp430-gcc.nix        TI MSP430 GCC + device support files
 nix/esp-rust.nix          Espressif's Rust toolchain (Xtensa)
 nix/rpi-run.nix           copy a binary to a Raspberry Pi over SSH and run it
 nix/rpi-boot.nix          write a bare-metal kernel + GPU firmware + config.txt for an SD card
-scripts/check-examples.sh build + language-server check of every example
-examples/blink-<board>-<lang>/
+udev/                     udev rule for TI's eZ-FET (the other probes' come with their packages)
+scripts/check-examples.sh build, lint, format and language-server check of every example
+scripts/clang-tidy-cross.py  clang-tidy over cross-compiled code (used by check-examples)
+scripts/lint-repo.sh      lint + format check of the repo's own Nix, shell, Python, Markdown
+examples/<system>/        pico, esp32, stm32, msp430, rpi, rpi-baremetal, host
+examples/<system>/blink-<lang>/   blink-regs-<lang>/ for the register-level ones
   .envrc                  uses this repo's flake locally, the GitHub one otherwise
-  .vscode/                language-server + direnv settings, extension recommendations
+  .vscode/                language-server, format-on-save + direnv settings, extension recommendations
+  .clang-format, .clang-tidy  (C/C++) code style and lint checks
   CMakePresets.json       (C/C++) Ninja build in build/, compile_commands.json on
   .cargo/config.toml      (Rust) target, linker flags, flash runner
+  *.ld, memory.x          linker script (register-level examples; see above)
+examples/host/python/     uv project + `mcu` CLI (pyproject.toml, uv.lock, src/, tests/)
 ```
 
 ## Notes
@@ -201,7 +371,6 @@ examples/blink-<board>-<lang>/
   leave trapped. Like the Linux examples, these blink an LED on GPIO 17 (pin
   11). You can try the Zero, Pi 3 and Pi 4 images in QEMU, for example
   `qemu-system-aarch64 -M raspi3b -kernel build/boot/kernel8.img`.
-
 - **STM32 HAL.** The STM32 C/C++ examples are register-level, so they need only
   the toolchain. For HAL projects, generate a CMake project in STM32CubeMX
   (*Toolchain/IDE → CMake*) and build it in the `stm32` shell. CubeMX is unfree
@@ -210,9 +379,11 @@ examples/blink-<board>-<lang>/
   `memory.x` and the target and runner in `.cargo/config.toml`. For RISC-V ESP32
   chips (C3, C6, ...), use e.g. `target = "riscv32imc-unknown-none-elf"` with the
   matching `esp-hal` feature.
-- **Pico 2 (RP2350).** For C/C++, set `PICO_BOARD` to `pico2` in
-  `CMakePresets.json`. For Rust, use `rp235x-hal` and `thumbv8m.main-none-eabihf`.
-  Only the Arm cores are covered, not the RISC-V Hazard3 cores.
+- **Pico 2 (RP2350).** The C/C++ examples (SDK and register-level) have a
+  `pico2` preset, and `pico/blink-regs-rust` builds for it with
+  `--target thumbv8m.main-none-eabihf`. For a HAL-based Rust project, use
+  `rp235x-hal` with that target. Only the Arm cores are covered, not the
+  RISC-V Hazard3 cores.
 - **Version pins.** ESP-IDF comes from
   [nixpkgs-esp-dev](https://github.com/mirrexagon/nixpkgs-esp-dev), using that
   project's own nixpkgs pin, because ESP-IDF's Python tooling breaks on newer

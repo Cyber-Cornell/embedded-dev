@@ -1,0 +1,23 @@
+[package]
+name = "blink"
+version = "0.1.0"
+edition = "2024"
+
+# Register-level: no esp-hal, PAC or runtime crate. The ROM loads the program
+# straight into RAM (see esp32.ld) and calls `call_start_cpu0`.
+[dependencies]
+
+[[bin]]
+name = "blink"
+test = false
+bench = false
+
+[profile.dev]
+# Unoptimised Xtensa code is very slow and large; optimise even debug builds.
+opt-level = "s"
+
+[profile.release]
+debug = 2
+lto = "fat"
+codegen-units = 1
+opt-level = "s"

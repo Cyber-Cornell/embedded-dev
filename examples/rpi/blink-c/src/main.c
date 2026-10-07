@@ -16,22 +16,28 @@
 
 // Labels of the chip that drives the 40-pin header. Its gpiochip number varies
 // (the Pi 5's RP1 was gpiochip4 on older kernels), so look it up by label.
-static const char *const HEADER_CHIPS[] = {
-    "pinctrl-bcm2835", // Pi Zero, Zero W, Zero 2 W, 3
-    "pinctrl-bcm2711", // Pi 4
-    "pinctrl-rp1",     // Pi 5
+static const char* const HEADER_CHIPS[] = {
+    "pinctrl-bcm2835",  // Pi Zero, Zero W, Zero 2 W, 3
+    "pinctrl-bcm2711",  // Pi 4
+    "pinctrl-rp1",      // Pi 5
 };
 
 static int open_header_chip(void) {
-  DIR *dev = opendir("/dev");
-  if (!dev) return -1;
-  struct dirent *entry;
+  DIR* dev = opendir("/dev");
+  if (!dev) {
+    return -1;
+  }
+  struct dirent* entry;
   while ((entry = readdir(dev))) {
-    if (strncmp(entry->d_name, "gpiochip", 8) != 0) continue;
+    if (strncmp(entry->d_name, "gpiochip", 8) != 0) {
+      continue;
+    }
     char path[300];
     snprintf(path, sizeof path, "/dev/%s", entry->d_name);
     int fd = open(path, O_RDWR | O_CLOEXEC);
-    if (fd < 0) continue;
+    if (fd < 0) {
+      continue;
+    }
     struct gpiochip_info info = {0};
     if (ioctl(fd, GPIO_GET_CHIPINFO_IOCTL, &info) == 0) {
       for (size_t i = 0; i < sizeof HEADER_CHIPS / sizeof *HEADER_CHIPS; i++) {
