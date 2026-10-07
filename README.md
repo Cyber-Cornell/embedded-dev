@@ -54,14 +54,16 @@ shells; you install only the pieces below once per machine.
 
    Log out and back in afterwards; `groups` should list `dialout`.
 4. **USB probes: udev rules,** so `picotool`, `openocd`, `st-flash`,
-   `probe-rs` and `mspdebug` work without `sudo`. The packages ship the rules
-   (OpenOCD's also cover the XDS110 on MSPM0 LaunchPads), except for TI's
-   eZ-FET, whose rule is in [`udev/`](udev/70-ti-msp430.rules).
-   - NixOS:
+   `probe-rs` and `mspdebug` work without `sudo`. The packages ship the rules,
+   except for TI's probes, whose rules are in [`udev/`](udev/): the eZ-FET on
+   MSP430 LaunchPads and the XDS110 on MSPM0 LaunchPads. (OpenOCD's rules list
+   the XDS110 but give it to the `plugdev` group, which NixOS doesn't have.)
+   - NixOS (copy the two files next to `configuration.nix`):
 
      ```nix
      services.udev.packages = with pkgs; [ picotool openocd stlink probe-rs-tools ];
-     services.udev.extraRules = builtins.readFile ./70-ti-msp430.rules; # copy of udev/70-ti-msp430.rules
+     services.udev.extraRules =
+       builtins.readFile ./70-ti-msp430.rules + builtins.readFile ./70-ti-xds110.rules;
      ```
 
    - Other distributions:
@@ -70,7 +72,7 @@ shells; you install only the pieces below once per machine.
      for p in picotool openocd stlink probe-rs-tools; do
        sudo cp "$(nix build --no-link --print-out-paths nixpkgs#$p)"/{etc,lib}/udev/rules.d/*.rules /etc/udev/rules.d/ 2>/dev/null
      done
-     sudo cp udev/70-ti-msp430.rules /etc/udev/rules.d/
+     sudo cp udev/*.rules /etc/udev/rules.d/
      sudo udevadm control --reload && sudo udevadm trigger
      ```
 
@@ -151,7 +153,9 @@ line is active.
   block. Only the RP2350's Arm cores are covered, and the Pico W / Pico 2 W
   LEDs sit behind the wireless chip, so these examples don't blink them.
 - **LP-MSPM0L2228.** The examples blink the blue channel of the RGB LED
-  (LED4, PA23); jumper J4 must be on. Red is PB10 (J5) and green PB9 (J6).
+  (LED4, PA16); the jumper labeled PA16 must be on. Red is PB10 and green
+  PB9, on the jumpers labeled with those pins. (TI's SDK example READMEs say
+  PA23 for blue; the board is wired to PA16.)
   The register-level examples don't use the MSPM0 SDK at all; their startup
   code and linker script are in the project. Don't link anything into the
   NONMAIN flash at `0x41C00000` (the boot configuration and ROM bootloader
@@ -337,7 +341,7 @@ nix/mspm0-sdk.nix         TI MSPM0 SDK: DriverLib, device headers, startup files
 nix/esp-rust.nix          Espressif's Rust toolchain (Xtensa)
 nix/rpi-run.nix           copy a binary to a Raspberry Pi over SSH and run it
 nix/rpi-boot.nix          write a bare-metal kernel + GPU firmware + config.txt for an SD card
-udev/                     udev rule for TI's eZ-FET (the other probes' come with their packages)
+udev/                     udev rules for TI's eZ-FET and XDS110 (the other probes' come with their packages)
 scripts/check-examples.sh build, lint, format and language-server check of every example
 scripts/clang-tidy-cross.py  clang-tidy over cross-compiled code (used by check-examples)
 scripts/lint-repo.sh      lint + format check of the repo's own Nix, shell, Python, Markdown

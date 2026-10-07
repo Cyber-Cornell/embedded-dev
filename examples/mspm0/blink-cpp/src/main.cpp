@@ -4,7 +4,9 @@
 #include <cstdint>
 
 // Blinks the blue channel of the LP-MSPM0L2228's RGB LED (LED4) with TI's
-// DriverLib. Blue is PA23 (jumper J4), red PB10 (J5), green PB9 (J6).
+// DriverLib. Blue is PA16, red PB10, green PB9, each through a jumper
+// labeled with its pin. (TI's SDK example READMEs say PA23 for blue; the
+// board is wired to PA16.)
 namespace {
 
 // Cycles to wait after powering a peripheral, as in TI's SysConfig output.
@@ -14,7 +16,7 @@ constexpr std::uint32_t kHalfPeriod = 16'000'000;
 
 class OutputPin {
  public:
-  // pincm is the pin's IOMUX pin control register, e.g. IOMUX_PINCM67 (PA23).
+  // pincm is the pin's IOMUX pin control register, e.g. IOMUX_PINCM42 (PA16).
   OutputPin(GPIO_Regs* port, std::uint32_t pin, IOMUX_PINCM pincm)
       : port_(port), pin_(pin) {
     DL_GPIO_initDigitalOutput(pincm);
@@ -40,7 +42,7 @@ void powerOn(GPIO_Regs* port) {
 int main() {
   powerOn(GPIOA);
 
-  OutputPin led(GPIOA, DL_GPIO_PIN_23, IOMUX_PINCM67);
+  OutputPin led(GPIOA, DL_GPIO_PIN_16, IOMUX_PINCM42);
   for (;;) {
     led.toggle();
     DL_Common_delayCycles(kHalfPeriod);

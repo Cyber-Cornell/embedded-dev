@@ -26,8 +26,9 @@ add_custom_command(TARGET blink.elf POST_BUILD
 )
 
 # `cmake --build build --target flash` (the LaunchPad's XDS110 probe).
+# MSPM0 has SWD only; probe-rs would otherwise try JTAG first through the XDS110.
 add_custom_target(flash
-  COMMAND probe-rs download --chip ${DEVICE} --verify blink.elf
-  COMMAND probe-rs reset --chip ${DEVICE}
+  COMMAND probe-rs download --chip ${DEVICE} --protocol swd --verify blink.elf
+  COMMAND probe-rs reset --chip ${DEVICE} --protocol swd
   DEPENDS blink.elf
 )

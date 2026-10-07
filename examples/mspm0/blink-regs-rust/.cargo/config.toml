@@ -3,7 +3,8 @@ target = "thumbv6m-none-eabi" # Cortex-M0+ (MSPM0)
 
 [target.thumbv6m-none-eabi]
 # Flashes over the LaunchPad's on-board XDS110: `cargo run --release`.
-runner = "probe-rs run --chip MSPM0L2228"
+# MSPM0 has SWD only; probe-rs would otherwise try JTAG first through the XDS110.
+runner = "probe-rs run --chip MSPM0L2228 --protocol swd"
 # cortex-m-rt's link.x, which INCLUDEs memory.x, is the default.
 # mspm0l2228.ld is a single-file copy of the two to edit, e.g. to move the
 # program behind a bootloader; to use it, swap the rustflags lines.

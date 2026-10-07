@@ -1,9 +1,10 @@
 #include <stdint.h>
 
 // Register-level blink of the blue channel of the LP-MSPM0L2228's RGB LED
-// (LED4), with no SDK or DriverLib. Blue is PA23 (jumper J4), red PB10 (J5),
-// green PB9 (J6). Addresses and keys are from the MSPM0 SDK's mspm0l222x.h,
-// hw_gpio.h and hw_iomux.h.
+// (LED4), with no SDK or DriverLib. Blue is PA16, red PB10, green PB9, each
+// through a jumper labeled with its pin (TI's SDK example READMEs say PA23
+// for blue; the board is wired to PA16). Addresses and keys are from the
+// MSPM0 SDK's mspm0l222x.h, hw_gpio.h and hw_iomux.h.
 #define GPIOA_BASE 0x400A0000u
 #define IOMUX_BASE 0x40428000u
 
@@ -26,8 +27,8 @@
 #define PINCM_PC (1u << 7)  // pin connected to its peripheral
 #define PINCM_PF_GPIO 1u    // peripheral function 1 is GPIO on every pin
 
-#define LED_PIN 23u    // PA23
-#define LED_PINCM 67u  // PA23's pin control register
+#define LED_PIN 16u    // PA16
+#define LED_PINCM 42u  // PA16's pin control register
 
 static void delay(volatile uint32_t count) {
   while (count--) {

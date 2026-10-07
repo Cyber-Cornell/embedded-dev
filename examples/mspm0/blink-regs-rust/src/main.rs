@@ -1,7 +1,8 @@
 //! Register-level blink of the blue channel of the LP-MSPM0L2228's RGB LED
-//! (LED4), without a HAL or PAC. Blue is PA23 (jumper J4), red PB10 (J5),
-//! green PB9 (J6). Addresses and keys are from the MSPM0 SDK's mspm0l222x.h,
-//! hw_gpio.h and hw_iomux.h.
+//! (LED4), without a HAL or PAC. Blue is PA16, red PB10, green PB9, each
+//! through a jumper labeled with its pin (TI's SDK example READMEs say PA23
+//! for blue; the board is wired to PA16). Addresses and keys are from the
+//! MSPM0 SDK's mspm0l222x.h, hw_gpio.h and hw_iomux.h.
 #![no_std]
 #![no_main]
 
@@ -34,8 +35,8 @@ const RSTCTL_RESETASSERT: u32 = 1 << 0;
 const PINCM_PC: u32 = 1 << 7; // pin connected to its peripheral
 const PINCM_PF_GPIO: u32 = 1; // peripheral function 1 is GPIO on every pin
 
-const LED_PIN: u32 = 23; // PA23
-const LED_PINCM: usize = 67; // PA23's pin control register
+const LED_PIN: u32 = 16; // PA16
+const LED_PINCM: usize = 42; // PA16's pin control register
 
 /// Writes a memory-mapped register. Only used with the fixed peripheral
 /// addresses above.

@@ -1,0 +1,8 @@
+# TI XDS110 debug probe (on MSPM0 LaunchPads; 0451:bef3, 0451:bef4 in its
+# bootloader): let the user run `probe-rs` without sudo. OpenOCD's rules list
+# it, but with GROUP="plugdev", a group NixOS doesn't have, so the device stays
+# root-only wherever `uaccess` doesn't apply. The XDS110's CMSIS-DAP interface
+# is v1 (HID), so probe-rs opens /dev/hidrawN as well as the raw USB node;
+# both need the rule. dialout is the group the serial ports already require.
+SUBSYSTEM=="usb", ATTR{idVendor}=="0451", ATTR{idProduct}=="bef[34]", MODE="0660", GROUP="dialout", TAG+="uaccess"
+KERNEL=="hidraw*", ATTRS{idVendor}=="0451", ATTRS{idProduct}=="bef[34]", MODE="0660", GROUP="dialout", TAG+="uaccess"

@@ -1,5 +1,7 @@
 //! Blinks the blue channel of the LP-MSPM0L2228's RGB LED (LED4) with
-//! embassy-mspm0. Blue is PA23 (jumper J4), red PB10 (J5), green PB9 (J6).
+//! embassy-mspm0. Blue is PA16, red PB10, green PB9, each through a jumper
+//! labeled with its pin. (TI's SDK example READMEs say PA23 for blue; the
+//! board is wired to PA16.)
 #![no_std]
 #![no_main]
 
@@ -12,7 +14,7 @@ use panic_halt as _;
 #[embassy_executor::main]
 async fn main(_spawner: Spawner) -> ! {
     let p = embassy_mspm0::init(Config::default());
-    let mut led = Output::new(p.PA23, Level::Low);
+    let mut led = Output::new(p.PA16, Level::Low);
 
     loop {
         led.toggle();

@@ -3,10 +3,12 @@
 #include <ti/driverlib/dl_gpio.h>
 
 // Blinks the blue channel of the LP-MSPM0L2228's RGB LED (LED4) with TI's
-// DriverLib. Blue is PA23 (jumper J4), red PB10 (J5), green PB9 (J6).
+// DriverLib. Blue is PA16, red PB10, green PB9, each through a jumper
+// labeled with its pin. (TI's SDK example READMEs say PA23 for blue; the
+// board is wired to PA16.)
 #define LED_PORT GPIOA
-#define LED_PIN DL_GPIO_PIN_23
-#define LED_IOMUX IOMUX_PINCM67  // PA23's pin control register
+#define LED_PIN DL_GPIO_PIN_16
+#define LED_IOMUX IOMUX_PINCM42  // PA16's pin control register
 
 // Cycles to wait after powering a peripheral, as in TI's SysConfig output.
 #define POWER_STARTUP_DELAY 16u
