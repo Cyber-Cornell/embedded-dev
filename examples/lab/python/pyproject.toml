@@ -1,0 +1,68 @@
+[project]
+name = "lab-tools"
+version = "0.1.0"
+description = "Python toolkit for eCTF and embedded security work: binaries, firmware, crypto, captures"
+requires-python = ">=3.12"
+dependencies = [
+  # Binaries and firmware: ELF parsing, disassembly, emulation, assembly.
+  "pwntools>=4.14",
+  "pyelftools>=0.31",
+  "lief>=0.16",
+  "capstone>=5",
+  "unicorn>=2.1.4",
+  "keystone-engine>=0.9.2",
+  "setuptools", # keystone-engine imports distutils, which Python 3.12 dropped
+  # Talking to boards.
+  "pyserial>=3.5",
+  # Crypto.
+  "cryptography>=43",
+  "pycryptodome>=3.21",
+  "z3-solver>=4.13",
+  # Analysis and notebooks: logic-analyzer captures, power traces, ...
+  "numpy>=2",
+  "scipy>=1.14",
+  "pandas>=2.2",
+  "matplotlib>=3.9",
+  "marimo>=0.10",
+]
+
+[project.scripts]
+elfinfo = "lab_tools.elfinfo:main"
+
+[dependency-groups]
+dev = ["pytest>=8", "types-pyserial"]
+# Opt-in (large): add "angr" to default-groups below to install it.
+angr = ["angr>=9.2"]
+
+[tool.uv]
+default-groups = ["dev"]
+# The dev shells are Linux-only; don't resolve for other platforms.
+environments = ["sys_platform == 'linux'"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff.lint]
+select = [
+  "E", "W", # pycodestyle
+  "F",      # pyflakes
+  "I",      # import sorting
+  "N",      # naming
+  "B",      # bugbear
+  "UP",     # pyupgrade
+  "SIM",    # simplify
+  "C4",     # comprehensions
+  "RET",    # return statements
+  "PTH",    # pathlib
+  "PT",     # pytest style
+  "RUF",    # ruff-specific
+]
+
+[tool.pyright]
+typeCheckingMode = "standard"
+venvPath = "."
+venv = ".venv"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,5 +1,5 @@
 {
-  description = "Per-target embedded C/C++/Rust dev shells (RP2040/RP2350, ESP32, STM32, TI MSPM0, TI MSP430, Raspberry Pi Linux and bare metal), plus a Python shell for host-side tools";
+  description = "Per-target embedded C/C++/Rust dev shells (RP2040/RP2350, ESP32, STM32, TI MSPM0, TI MSP430, Raspberry Pi Linux and bare metal), a plain-PC base shell, a Python shell for host-side tools and an embedded-security lab shell";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -10,6 +10,9 @@
       url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    # pwndbg left nixpkgs; its own flake builds it (with its own gdb and
+    # Python pins, so it keeps its own nixpkgs). Pinned to a release tag.
+    pwndbg.url = "github:pwndbg/pwndbg/2026.09.15";
   };
 
   outputs =
@@ -18,6 +21,7 @@
       nixpkgs,
       esp-dev,
       rust-overlay,
+      pwndbg,
     }:
     let
       systems = [ "x86_64-linux" ];
@@ -106,6 +110,28 @@
               "aarch64-unknown-linux-musl" # Pi 3/4/5, Zero 2 W (64-bit OS)
               "arm-unknown-linux-musleabihf" # Pi Zero/Zero W, or any Pi on a 32-bit OS (ARMv6 + VFP)
             ];
+          };
+
+          # Stable Rust for programs that run on this computer.
+          rustHost = pkgs.rust-bin.stable.latest.default.override {
+            extensions = [
+              "rust-src"
+              "rust-analyzer"
+            ];
+          };
+
+          # Python for uv projects: uv uses this interpreter instead of
+          # downloading its own (those builds don't run on NixOS).
+          python = pkgs.python3;
+          pythonTools = [
+            python
+            pkgs.uv
+            pkgs.ruff
+            pkgs.pyright
+          ];
+          uvEnv = {
+            UV_PYTHON = "${python}/bin/python3";
+            UV_PYTHON_DOWNLOADS = "never";
           };
 
           # Tools every target shell gets: build system, editor tooling, serial
@@ -262,47 +288,116 @@
           };
 
           # Host-side Python: tools that talk to the boards, scripts, crypto.
-          # uv manages each project's .venv but uses this Python instead of
-          # downloading its own (those builds don't run on NixOS).
-          host =
+          host = mkTargetShell {
+            name = "host";
+            packages = pythonTools;
+            env = uvEnv;
+          };
+
+          # Plain programs for this computer in C, C++, Rust and Python: no
+          # board, no cross compiler. (mkShell's own GCC builds the C/C++.)
+          base = mkTargetShell {
+            name = "base";
+            packages =
+              (with pkgs; [
+                gdb
+                valgrind
+                rustHost
+              ])
+              ++ pythonTools;
+            env = uvEnv;
+          };
+
+          # Embedded-security lab (eCTF and the like): reverse engineering,
+          # debugging, firmware analysis, emulation and logic-analyzer
+          # captures, plus a uv project of Python tools (examples/lab/python).
+          lab =
             let
-              python = pkgs.python3;
+              # pwndbg runs its own Python (3.13); the shell's PYTHONPATH,
+              # which points at the shell Python's site-packages, would break it.
+              pwndbg-cmd = pkgs.writeShellScriptBin "pwndbg" ''
+                unset PYTHONPATH
+                exec ${pwndbg.packages.${system}.pwndbg}/bin/pwndbg "$@"
+              '';
             in
             mkTargetShell {
-              name = "host";
-              packages = [
-                python
-                pkgs.uv
-                pkgs.ruff
-                pkgs.pyright
-              ];
-              env = {
-                UV_PYTHON = "${python}/bin/python3";
-                UV_PYTHON_DOWNLOADS = "never";
+              name = "lab";
+              packages =
+                (with pkgs; [
+                  # Reverse engineering and binary inspection
+                  ghidra
+                  radare2
+                  imhex # hex editor with pattern language
+                  binwalk # carve and identify firmware images
+                  hexyl
+                  file
+                  checksec
+                  patchelf
+                  # Debugging and emulation. nixpkgs' gdb is multi-arch (Arm,
+                  # RISC-V, x86, ...); pwndbg is its own `pwndbg` command.
+                  gdb
+                  pwndbg-cmd
+                  strace
+                  qemu # qemu-system-arm etc. and qemu-<arch> user mode
+                  # Talking to Cortex-M targets: arm-none-eabi binutils/GCC
+                  # (also lets pwntools assemble Arm), debug probes.
+                  gcc-arm-embedded
+                  openocd
+                  probe-rs-tools
+                  # Logic analyzers (fx2lafw: SparkFun / Saleae-clone 8-channel
+                  # boards; libsigrok bundles the firmware).
+                  pulseview
+                  sigrok-cli
+                  # Network services
+                  socat
+                  netcat-openbsd
+                ])
+                ++ pythonTools;
+              env = uvEnv // {
+                # Binary wheels from PyPI (numpy, lief, z3, angr, keystone, ...)
+                # expect the C++ runtime and zlib in the usual system places,
+                # which NixOS doesn't have.
+                LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [
+                  pkgs.stdenv.cc.cc.lib
+                  pkgs.zlib
+                ];
               };
             };
         }
       );
 
-      # One template per example, named <system>-<example> without "blink-":
-      # examples/pico/blink-regs-c is `nix flake init -t <this flake>#pico-regs-c`,
-      # examples/host/python is #host-python.
+      # One template per example, named <system>-<example> without "blink-"
+      # or "hello-": examples/pico/blink-regs-c is
+      # `nix flake init -t <this flake>#pico-regs-c`, examples/base/hello-c is
+      # #base-c, examples/host/python is #host-python.
       templates =
         let
           inherit (nixpkgs) lib;
           dirsIn =
             path: lib.attrNames (lib.filterAttrs (_: type: type == "directory") (builtins.readDir path));
-          example = system: dir: {
-            name = "${system}-${lib.removePrefix "blink-" dir}";
-            value = {
-              path = ./examples/${system}/${dir};
-              description =
-                if lib.hasPrefix "blink-" dir then
-                  "Blink example for ${system}: ${lib.removePrefix "blink-" dir}"
-                else
-                  "Host-side Python project (uv, ruff, pyright, pyserial)";
-            };
+          descriptions = {
+            host-python = "Host-side Python project (uv, ruff, pyright, pyserial)";
+            lab-python = "Embedded-security Python tools (uv: pwntools, capstone, unicorn, marimo, ...)";
           };
+          example =
+            system: dir:
+            let
+              lang = lib.removePrefix "hello-" (lib.removePrefix "blink-" dir);
+              name = "${system}-${lang}";
+            in
+            {
+              inherit name;
+              value = {
+                path = ./examples/${system}/${dir};
+                description =
+                  descriptions.${name} or (
+                    if lib.hasPrefix "hello-" dir then
+                      "Hello world for this computer: ${lang}"
+                    else
+                      "Blink example for ${system}: ${lang}"
+                  );
+              };
+            };
         in
         lib.listToAttrs (
           lib.concatMap (system: map (example system) (dirsIn ./examples/${system})) (dirsIn ./examples)

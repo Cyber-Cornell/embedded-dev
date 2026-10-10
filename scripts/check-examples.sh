@@ -10,7 +10,7 @@ cd "$(dirname "$0")/../examples" || exit 1
 shell_for() {
   case "$1" in
     *pico*) echo pico ;; *esp32*) echo esp32 ;; *stm32*) echo stm32 ;; *mspm0*) echo mspm0 ;; *msp430*) echo ti ;; *rpi-baremetal*) echo rpi-baremetal ;; *rpi*) echo rpi ;;
-    host/*) echo host ;;
+    host/*) echo host ;; base/*) echo base ;; lab/*) echo lab ;;
   esac
 }
 
@@ -28,13 +28,16 @@ check() {
         # Code behind a disabled cfg (e.g. the other chip) is only faded out.
         diags=$(rust-analyzer diagnostics . 2>/dev/null | grep -Ev "^(processing crate|diagnostic scan complete|$)" | grep -v "inactive_code")
         lints=$(cargo clippy --release 2>&1 | grep -E "^(warning|error)" | grep -v "future version of Rust")
+        # Programs for this computer (no .cargo/config.toml) run their tests.
+        if [[ ! -f .cargo/config.toml ]]; then
+          cargo test -q >"$log" 2>&1 || { tail -30 "$log"; exit 1; }
         # Second chip of the Pico example (Pico 2, RP2350).
-        if grep -q "^\[target.thumbv8m.main-none-eabihf\]" .cargo/config.toml; then
+        elif grep -q "^\[target.thumbv8m.main-none-eabihf\]" .cargo/config.toml; then
           lints+=$(cargo clippy --release --target thumbv8m.main-none-eabihf 2>&1 | grep -E "^(warning|error)")
         fi
         lints+=$(cargo fmt --check 2>&1 | head -20)
         ;;
-      */host/*) # Python projects
+      *python) # Python (uv) projects
         uv sync --locked >"$log" 2>&1 || { cat "$log"; exit 1; }
         diags=$(pyright 2>&1 | grep -E " - (error|warning)")
         lints=$(ruff check --quiet . 2>&1; ruff format --check --quiet . 2>&1)
@@ -51,7 +54,7 @@ check() {
         fi
         ;;
     esac
-    if [[ "$PWD" != *-rust && "$PWD" != */host/* ]]; then
+    if [[ "$PWD" != *-rust && "$PWD" != *python ]]; then
       srcs=$(find src main -name "*.c" -o -name "*.cpp" -o -name "*.h" 2>/dev/null)
       # Errors clangd would show in the editor (clangd skips clang-tidy in
       # --check mode, so that runs below).

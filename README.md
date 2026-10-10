@@ -1,7 +1,9 @@
 # embedded-dev
 
 Reproducible Nix dev shells for embedded targets in C, C++ and Rust, plus a
-Python shell for host-side tools. VS Code's language servers understand each
+Python shell for host-side tools, a `base` shell for plain programs on your
+computer and a `lab` shell for embedded security work such as
+[eCTF](https://ectf.mitre.org/). VS Code's language servers understand each
 cross toolchain, so you don't get false "header not found" or "undeclared
 identifier" warnings, and every example formats on save and shows lint
 warnings.
@@ -16,6 +18,8 @@ warnings.
 | `rpi` | Raspberry Pi 3, 4, 5, Zero, Zero W, Zero 2 W (Linux userspace) | static musl GCC for aarch64 and ARMv6 hard-float, `rpi-run` | stable + `aarch64-unknown-linux-musl`, `arm-unknown-linux-musleabihf` |
 | `rpi-baremetal` | Raspberry Pi 3, 4, 5, Zero, Zero W, Zero 2 W (no OS) | aarch64-none-elf + arm-none-eabi GCC, GPU firmware, `rpi-boot` | nightly + `rust-src` (`-Zbuild-std`): `aarch64-unknown-none-softfloat`, `armv6-none-eabihf` |
 | `host` | Your computer: tools that talk to the boards | — | — (Python 3, uv, Ruff, Pyright) |
+| `base` | Your computer: plain programs, no board | GCC, gdb, valgrind | stable (also Python 3, uv, Ruff, Pyright) |
+| `lab` | Your computer: reverse engineering, debugging, captures ([details](#embedded-security-lab)) | multi-arch gdb, pwndbg, arm-none-eabi GCC, OpenOCD, probe-rs | — (Python 3, uv: pwntools, angr, marimo, ...) |
 
 Every shell also has `cmake`, `ninja`, `make`, `bear`, `picocom`, `python3`,
 [`mcu`](#host-side-python-and-the-mcu-cli) (a serial-port CLI), a host C
@@ -53,15 +57,16 @@ shells; you install only the pieces below once per machine.
    - Other distributions: `sudo usermod -aG dialout $USER`.
 
    Log out and back in afterwards; `groups` should list `dialout`.
-4. **USB probes: udev rules,** so `picotool`, `openocd`, `st-flash`,
-   `probe-rs` and `mspdebug` work without `sudo`. The packages ship the rules,
+4. **USB probes and logic analyzers: udev rules,** so `picotool`, `openocd`,
+   `st-flash`, `probe-rs`, `mspdebug` and PulseView/`sigrok-cli` work without
+   `sudo`. The packages ship the rules,
    except for TI's probes, whose rules are in [`udev/`](udev/): the eZ-FET on
    MSP430 LaunchPads and the XDS110 on MSPM0 LaunchPads. (OpenOCD's rules list
    the XDS110 but give it to the `plugdev` group, which NixOS doesn't have.)
    - NixOS (copy the two files next to `configuration.nix`):
 
      ```nix
-     services.udev.packages = with pkgs; [ picotool openocd stlink probe-rs-tools ];
+     services.udev.packages = with pkgs; [ picotool openocd stlink probe-rs-tools libsigrok ];
      services.udev.extraRules =
        builtins.readFile ./70-ti-msp430.rules + builtins.readFile ./70-ti-xds110.rules;
      ```
@@ -69,7 +74,7 @@ shells; you install only the pieces below once per machine.
    - Other distributions:
 
      ```sh
-     for p in picotool openocd stlink probe-rs-tools; do
+     for p in picotool openocd stlink probe-rs-tools libsigrok; do
        sudo cp "$(nix build --no-link --print-out-paths nixpkgs#$p)"/{etc,lib}/udev/rules.d/*.rules /etc/udev/rules.d/ 2>/dev/null
      done
      sudo cp udev/*.rules /etc/udev/rules.d/
@@ -82,7 +87,8 @@ shells; you install only the pieces below once per machine.
      and clang-tidy.
    - `rust-lang.rust-analyzer`: Rust IntelliSense, rustfmt and clippy.
    - `ms-python.python`, `ms-python.vscode-pylance`, `charliermarsh.ruff`:
-     Python (the `host-python` example).
+     Python (the `host-python`, `base-python` and `lab-python` examples).
+   - `marimo-team.vscode-marimo`: optional, marimo notebooks (`lab-python`).
    - `ms-vscode.cmake-tools`: optional, for building C/C++ from the editor.
    - `marus25.cortex-debug` / `probe-rs.probe-rs-debugger`: optional, for
      debugging.
@@ -92,7 +98,8 @@ shells; you install only the pieces below once per machine.
    contradict clangd.
 
 The ESP-IDF toolchains are large: the `esp32` shell downloads a few GB the
-first time.
+first time. So does the `lab` shell (Ghidra, QEMU, ImHex), and the first time
+it also builds pwndbg.
 
 ## Examples / templates
 
@@ -167,11 +174,28 @@ line is active.
   replaces the board's second-stage bootloader, so ESP-IDF apps won't boot
   until you flash an ESP-IDF project again.
 
-Each example is also a flake template named `<board>-<lang>`:
+### Base examples (your computer)
+
+`examples/base/` has a hello world in each language for the `base` shell: no
+board and no cross compiler, the same editor setup as the board examples. Pass
+a name to greet someone other than the world.
+
+| Language | Example | Build and run |
+| --- | --- | --- |
+| C | [hello-c](examples/base/hello-c) | `cmake --preset default && cmake --build build && ./build/hello` |
+| C++ | [hello-cpp](examples/base/hello-cpp) | same as C |
+| Rust | [hello-rust](examples/base/hello-rust) | `cargo run`, `cargo test` |
+| Python | [hello-python](examples/base/hello-python) | `uv run hello`, `uv run pytest` |
+
+The shell also has `gdb` and `valgrind` (`gdb build/hello`,
+`valgrind ./build/hello`).
+
+Each example is also a flake template named `<board>-<lang>` (`base-<lang>`
+for the base examples):
 
 ```sh
 mkdir my-project && cd my-project
-nix flake init -t github:Cyber-Cornell/embedded-dev#pico-rust   # e.g. esp32-c, pico-regs-c, host-python
+nix flake init -t github:Cyber-Cornell/embedded-dev#pico-rust   # e.g. esp32-c, pico-regs-c, base-c, host-python, lab-python
 direnv allow
 code .
 ```
@@ -251,6 +275,60 @@ With a single board plugged in, `mcu` finds its port; otherwise pass
 `-p /dev/ttyACM0` or set `MCU_PORT`. `-p loop://` is an echo port for trying
 it out without hardware.
 
+## Embedded-security lab
+
+The `lab` shell is a workbench for reverse engineering and attacking (or
+defending) embedded systems, for example in MITRE's eCTF. Everything runs on
+your computer:
+
+| For | Tools |
+| --- | --- |
+| Reverse engineering | Ghidra (`ghidra`; headless: `ghidra-analyzeHeadless`), radare2, ImHex (hex editor with a pattern language), binwalk, hexyl, `file`, `checksec`, patchelf |
+| Debugging, emulation | `gdb` (multi-arch: Arm, RISC-V, x86, ...), `pwndbg`, `arm-none-eabi-gdb`, strace, QEMU (`qemu-system-arm`, `qemu-arm`, ...) |
+| Boards | arm-none-eabi GCC and binutils, OpenOCD, probe-rs, `mcu`, picocom |
+| Logic analyzers | PulseView, `sigrok-cli` (fx2lafw firmware included) |
+| Network services | socat, `nc` (OpenBSD netcat) |
+| Python | Python 3, uv, Ruff, Pyright, and the uv project below |
+
+[`examples/lab/python`](examples/lab/python) (template `lab-python`) is a uv
+project with the usual Python packages, pinned in `uv.lock`; its `.envrc`
+installs them into `.venv`:
+
+- **Binaries and firmware:** pwntools, pyelftools, LIEF, capstone (disassembler),
+  unicorn (CPU emulator), keystone (assembler)
+- **Crypto:** cryptography, PyCryptodome, z3-solver
+- **Analysis:** numpy, scipy, pandas, matplotlib, and marimo notebooks
+- **Boards:** pyserial
+- **Opt-in:** angr (large). Add `"angr"` to `default-groups` in
+  `pyproject.toml`. `.envrc` runs `uv sync` on every load, which removes
+  groups that aren't listed there, so a one-off `uv sync --group angr` won't
+  stick.
+
+```sh
+uv run elfinfo build/blink.elf     # arch, segments, hardening, entry-point disassembly
+uv run marimo edit notebooks/capture.py   # plot a logic-analyzer capture, decode UART
+uv run pytest                      # keystone -> capstone -> unicorn round trip
+uv add <package>                   # anything else
+```
+
+`elfinfo` works on Linux programs and cross-compiled firmware alike (for
+example a Cortex-M `.elf`, shown as Thumb code).
+
+- **pwndbg** is its own command: `pwndbg ./program`, or for a board,
+  `pwndbg build/blink.elf -ex "target extended-remote :3333"` with OpenOCD
+  running. Plain `gdb` starts without it.
+- **Logic analyzers.** The SparkFun 24 MHz 8-channel analyzer and other
+  Saleae-style clones use sigrok's `fx2lafw` driver. Install the udev rules
+  (see [Requirements](#requirements)), then start `pulseview`, or capture from
+  the command line and open the CSV in the notebook:
+  `sigrok-cli -d fx2lafw --config samplerate=1m --samples 1m -O csv > capture.csv`.
+- **Binary wheels on NixOS.** PyPI's wheels (numpy, LIEF, z3, angr, ...)
+  expect `libstdc++` and zlib in the usual system places. The `lab` shell puts
+  them on `LD_LIBRARY_PATH`, so the project works without nix-ld.
+- **ChipWhisperer** isn't included: it pins `numpy<=1.26.4`, which has no
+  wheels for the shell's Python 3.14 and conflicts with numpy 2. Give it a
+  project of its own with an older Python.
+
 ## Formatting and linting
 
 Saving a file in VS Code formats it, and lint warnings show up as you type:
@@ -311,8 +389,9 @@ exists. After that, clangd resolves pico-sdk, ESP-IDF, HAL and CMSIS headers.
 [`scripts/check-examples.sh`](scripts/check-examples.sh) builds every example
 (or the ones you name) in its shell, both chips for the Pico examples. It then
 runs the language server, the linters (clang-tidy, clippy, Ruff, Pyright) and
-the formatters' check modes from the command line, plus the Python tests. It
-fails on any diagnostic VS Code would show and on any unformatted file:
+the formatters' check modes from the command line, plus the Python tests and
+the `base` Rust tests. It fails on any diagnostic VS Code would show and on
+any unformatted file:
 
 ```sh
 scripts/check-examples.sh                      # all examples
@@ -345,8 +424,9 @@ udev/                     udev rules for TI's eZ-FET and XDS110 (the other probe
 scripts/check-examples.sh build, lint, format and language-server check of every example
 scripts/clang-tidy-cross.py  clang-tidy over cross-compiled code (used by check-examples)
 scripts/lint-repo.sh      lint + format check of the repo's own Nix, shell, Python, Markdown
-examples/<system>/        pico, esp32, stm32, mspm0, msp430, rpi, rpi-baremetal, host
+examples/<system>/        pico, esp32, stm32, mspm0, msp430, rpi, rpi-baremetal, host, base, lab
 examples/<system>/blink-<lang>/   blink-regs-<lang>/ for the register-level ones
+examples/base/hello-<lang>/       hello world for this computer (base shell)
   .envrc                  uses this repo's flake locally, the GitHub one otherwise
   .vscode/                language-server, format-on-save + direnv settings, extension recommendations
   .clang-format, .clang-tidy  (C/C++) code style and lint checks
@@ -354,6 +434,7 @@ examples/<system>/blink-<lang>/   blink-regs-<lang>/ for the register-level ones
   .cargo/config.toml      (Rust) target, linker flags, flash runner
   *.ld, memory.x          linker script (register-level examples; see above)
 examples/host/python/     uv project + `mcu` CLI (pyproject.toml, uv.lock, src/, tests/)
+examples/lab/python/      uv project for the lab: `elfinfo` CLI, marimo notebooks/
 ```
 
 ## Notes
@@ -407,7 +488,8 @@ examples/host/python/     uv project + `mcu` CLI (pyproject.toml, uv.lock, src/,
   [rust-overlay](https://github.com/oxalica/rust-overlay), and the MSP430
   nightly is pinned through `flake.lock`. embassy-mspm0 isn't on crates.io
   yet, so `mspm0/blink-rust` takes the embassy crates from one pinned git
-  commit.
+  commit. pwndbg comes from its own flake at a release tag, with that flake's
+  own nixpkgs (it builds its own gdb and Python).
 - **Updating.** `nix flake update` bumps everything. The MSP430 GCC and Xtensa
   Rust toolchains and the MSPM0 SDK are pinned by URL or tag and hash in
   `nix/`. After updating, run `scripts/check-examples.sh`.
