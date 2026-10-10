@@ -4,6 +4,15 @@
 #include "pico/cyw43_arch.h"
 #endif
 
+// Simulation builds (preset `sim`) log over the UART so the QEMU run can be
+// checked from its output. On hardware the logging compiles to nothing.
+#ifdef BLINK_SIM
+#include <stdio.h>
+#define SIM_LOG(msg) puts(msg)
+#else
+#define SIM_LOG(msg) ((void)0)
+#endif
+
 #define BLINK_DELAY_MS 500
 
 // PICO_DEFAULT_LED_PIN comes from the board header selected by PICO_BOARD
@@ -30,14 +39,21 @@ static void led_set(bool on) {
 }
 
 int main(void) {
+#ifdef BLINK_SIM
+  stdio_init_all();
+#endif
+  SIM_LOG("boot");
+
   if (led_init() != PICO_OK) {
     return -1;
   }
 
   while (true) {
     led_set(true);
+    SIM_LOG("LED on");
     sleep_ms(BLINK_DELAY_MS);
     led_set(false);
+    SIM_LOG("LED off");
     sleep_ms(BLINK_DELAY_MS);
   }
 }

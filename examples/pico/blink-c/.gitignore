@@ -1,4 +1,5 @@
 build/
 build-pico2/
+build-sim/
 .direnv/
 .cache/
