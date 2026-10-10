@@ -242,6 +242,32 @@ ST-Link, MSPM0 LaunchPad XDS110), `espflash` (ESP32; `esptool.py` for `esp32-reg
 `mspdebug tilib` (LaunchPad eZ-FET), `rpi-run` (Raspberry Pi over SSH) and
 `rpi-boot` (Raspberry Pi SD card).
 
+### Simulation (QEMU)
+
+The Pico (RP2040) blink-c example can run in QEMU without hardware. This
+covers the original Pico only: QEMU has no RP2350 (Pico 2) machine, and the
+Pico W's LED sits behind the wireless chip.
+
+QEMU's `raspi-pico` machine comes from an RFC patch series that is not
+upstream yet, so stock QEMU lacks it. Build a patched copy once, inside
+`nix develop nixpkgs#qemu`:
+
+```
+scripts/build-qemu-rp2040.sh
+export QEMU_RP2040=$HOME/.cache/embedded-dev/qemu-rp2040/src/build/qemu-system-arm
+```
+
+Then, in `examples/pico/blink-c`:
+
+```
+cmake --preset sim && cmake --build build-sim --target sim
+```
+
+The `sim` preset builds with the compiler's float routines (QEMU's boot ROM
+has no ROM versions) and logs `LED on` / `LED off` over the UART. The `sim`
+target runs the firmware for a few seconds and fails if the LED does not
+toggle. Hardware builds (`default`, `pico2`) are unchanged.
+
 ## Host-side Python and the `mcu` CLI
 
 The `host` shell is for Python that runs on your computer: tools that talk to

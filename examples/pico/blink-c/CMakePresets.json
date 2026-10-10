@@ -20,6 +20,15 @@
       "cacheVariables": {
         "PICO_BOARD": "pico2"
       }
+    },
+    {
+      "name": "sim",
+      "displayName": "Raspberry Pi Pico (RP2040) in QEMU",
+      "inherits": "default",
+      "binaryDir": "${sourceDir}/build-sim",
+      "cacheVariables": {
+        "BLINK_SIM": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -30,6 +39,10 @@
     {
       "name": "pico2",
       "configurePreset": "pico2"
+    },
+    {
+      "name": "sim",
+      "configurePreset": "sim"
     }
   ]
 }
