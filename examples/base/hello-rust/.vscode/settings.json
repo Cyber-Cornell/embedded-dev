@@ -1,0 +1,16 @@
+{
+  // Restart extensions whenever direnv loads the dev shell, so they see its
+  // toolchain on PATH.
+  "direnv.restart.automatic": true,
+  // Use the shell's rust-analyzer: it matches the shell's rustc, so the
+  // standard library sources and proc-macro server line up.
+  "rust-analyzer.server.path": "rust-analyzer",
+  // Format on save with rustfmt, and lint with clippy rather than plain
+  // `cargo check` whenever a file is saved.
+  "[rust]": {
+    "editor.defaultFormatter": "rust-lang.rust-analyzer",
+    "editor.formatOnSave": true
+  },
+  "rust-analyzer.checkOnSave": true,
+  "rust-analyzer.check.command": "clippy"
+}
