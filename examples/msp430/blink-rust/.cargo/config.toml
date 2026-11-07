@@ -3,6 +3,8 @@ target = "msp430-none-elf"
 
 [target.msp430-none-elf]
 # eZ-FET LaunchPads: `cargo run --release`. Older G2 LaunchPads: rf2500.
+# On macOS the `ti` shell overrides this with CARGO_TARGET_MSP430_NONE_ELF_RUNNER
+# (`mspdebug ezfet prog`; tilib isn't available there).
 runner = "mspdebug tilib prog"
 # Links with msp430-elf-gcc from the `ti` shell (the target's default linker).
 rustflags = [

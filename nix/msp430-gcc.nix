@@ -15,6 +15,19 @@
 let
   baseUrl = "https://dr-download.ti.com/software-development/ide-configuration-compiler-or-debugger/MD-LlCjWuAbzH/9.3.1.2";
 
+  # TI's macOS build is x86-64 only; Apple Silicon runs it through Rosetta 2.
+  # It links only against macOS's own libraries, so it needs no patching.
+  srcs = {
+    x86_64-linux = fetchurl {
+      url = "${baseUrl}/msp430-gcc-9.3.1.11_linux64.tar.bz2";
+      hash = "sha256-tghRthVl493SGTKYo/rFEgwkAllxdBBsxfhIK56ZhuY=";
+    };
+    aarch64-darwin = fetchurl {
+      url = "${baseUrl}/msp430-gcc-9.3.1.11_macos.tar.bz2";
+      hash = "sha256-fR80oAFYe/5AvBJ4nRVDshTiRTVyHXlIZdmei6+xee8=";
+    };
+  };
+
   supportFiles = fetchzip {
     url = "${baseUrl}/msp430-gcc-support-files-1.212.zip";
     hash = "sha256-/M7g7wP+c2ul+qQ1WCp3sDPc8veSZlhyX5KAW3AyK20=";
@@ -32,13 +45,12 @@ stdenv.mkDerivation {
   pname = "msp430-gcc-ti";
   version = "9.3.1.11";
 
-  src = fetchurl {
-    url = "${baseUrl}/msp430-gcc-9.3.1.11_linux64.tar.bz2";
-    hash = "sha256-tghRthVl493SGTKYo/rFEgwkAllxdBBsxfhIK56ZhuY=";
-  };
+  src =
+    srcs.${stdenv.hostPlatform.system}
+      or (throw "msp430-gcc-ti: unsupported system ${stdenv.hostPlatform.system}");
 
-  nativeBuildInputs = [ autoPatchelfHook ];
-  buildInputs = [
+  nativeBuildInputs = lib.optionals stdenv.hostPlatform.isLinux [ autoPatchelfHook ];
+  buildInputs = lib.optionals stdenv.hostPlatform.isLinux [
     stdenv.cc.cc.lib
     ncurses5
     expat
@@ -78,6 +90,6 @@ stdenv.mkDerivation {
       gpl3Plus
       bsd3
     ];
-    platforms = [ "x86_64-linux" ];
+    platforms = lib.attrNames srcs;
   };
 }
