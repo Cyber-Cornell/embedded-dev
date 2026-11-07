@@ -32,8 +32,10 @@ toolchains.
 
 ## Requirements
 
-Linux on x86-64. Everything else that builds or flashes comes from the dev
-shells; you install only the pieces below once per machine.
+Linux on x86-64, or macOS on Apple Silicon (see [macOS](#macos); Intel Macs
+aren't supported because nixpkgs dropped them). Everything else that builds or
+flashes comes from the dev shells; you install only the pieces below once per
+machine.
 
 1. **Nix with flakes.**
    - NixOS: add `nix.settings.experimental-features = [ "nix-command" "flakes" ];`
@@ -100,6 +102,88 @@ shells; you install only the pieces below once per machine.
 The ESP-IDF toolchains are large: the `esp32` shell downloads a few GB the
 first time. So does the `lab` shell (Ghidra, QEMU, ImHex), and the first time
 it also builds pwndbg.
+
+### macOS
+
+The same shells, examples and templates work on an Apple Silicon Mac (M1 or
+newer). Setup, once per Mac:
+
+1. **Xcode Command Line Tools,** for `git`: `xcode-select --install`.
+2. **Rosetta 2,** because TI only ships MSP430 GCC for x86-64 Macs (the `ti`
+   shell runs it through Rosetta):
+   `softwareupdate --install-rosetta --agree-to-license`.
+3. **Nix with flakes.** Install it with `sh <(curl -L https://nixos.org/nix/install)`
+   (it sets up the multi-user daemon and an APFS volume for `/nix`), open a new
+   terminal, then enable flakes:
+
+   ```sh
+   mkdir -p ~/.config/nix
+   echo "experimental-features = nix-command flakes" >> ~/.config/nix/nix.conf
+   ```
+
+   A macOS update can remove Nix's lines from `/etc/zshrc`. If `nix` stops
+   being found after an update, add them back from `/etc/zshrc.backup-before-nix`.
+4. **direnv with nix-direnv:**
+
+   ```sh
+   nix profile install nixpkgs#direnv nixpkgs#nix-direnv
+   echo 'eval "$(direnv hook zsh)"' >> ~/.zshrc
+   mkdir -p ~/.config/direnv
+   echo 'source $HOME/.nix-profile/share/nix-direnv/direnvrc' >> ~/.config/direnv/direnvrc
+   ```
+
+   Then open a new terminal.
+5. **VS Code** with the same extensions as on Linux (step 5 above). Run
+   **Shell Command: Install 'code' command in PATH** from the Command Palette
+   so `code .` works from a terminal.
+
+There are no `dialout` groups or udev rules on macOS: any user can open the
+serial ports and USB probes. Try it:
+
+```sh
+git clone https://github.com/Cyber-Cornell/embedded-dev && cd embedded-dev/examples/pico/blink-c
+direnv allow          # first load downloads the toolchains
+cmake --preset default && cmake --build build
+code .
+```
+
+What's different on a Mac:
+
+- **Serial ports** are `/dev/cu.*`, not `/dev/ttyUSB*` / `/dev/ttyACM*`:
+  `/dev/cu.usbmodem*` for the Pico, Nucleo and LaunchPads, and
+  `/dev/cu.usbserial-*` or `/dev/cu.wchusbserial*` for an ESP32 DevKit (e.g.
+  `idf.py -p /dev/cu.usbserial-0001 flash monitor`, `ESPPORT=...`). Use the
+  `cu.` device, not `tty.`, which waits for a modem carrier signal. `mcu ports`
+  lists them. Recent macOS versions usually recognize the DevKits' CP210x and
+  CH340 USB-UART chips. If no port shows up, install the chip maker's driver.
+- **Pico:** in BOOTSEL mode the board also mounts as the `RPI-RP2` (Pico 2:
+  `RP2350`) drive, so dragging `build/blink.uf2` onto it in Finder works as
+  well as `picotool load`.
+- **`stm32`:** no `st-flash` / `st-info`, which nixpkgs builds for Linux only.
+  The examples flash with OpenOCD and probe-rs, which are both in the shell.
+- **`ti` (MSP430):** TI's MSP Debug Stack (`libmsp430`), which mspdebug's
+  `tilib` driver loads, is x86-64-only on macOS, and an Apple Silicon mspdebug
+  can't load it. The shell therefore sets `MSPDEBUG_DRIVER=ezfet` and
+  `CARGO_TARGET_MSP430_NONE_ELF_RUNNER="mspdebug ezfet prog"`, so the
+  examples' flash target and `cargo run` use mspdebug's own eZ-FET driver.
+  mspdebug calls that driver preliminary. If it fails to program the
+  LaunchPad, flash the `.elf` with TI's
+  [UniFlash](https://www.ti.com/tool/UNIFLASH) for macOS. Older eZ430/rf2500
+  LaunchPads use `-DMSPDEBUG_DRIVER=rf2500` as on Linux.
+- **`base`:** `lldb` instead of `gdb` and `valgrind`, which don't support
+  macOS programs. The C/C++ compiler is clang, not GCC.
+- **`lab`:** no `strace` or `checksec` (Linux-only; `uv run elfinfo`
+  reports hardening flags), and `nc` is macOS's own. `gdb` and `pwndbg` work for
+  remote targets (OpenOCD's `:3333`, QEMU's gdbstub, `gdbserver` on a Linux
+  box) but can't debug Mac programs; use `lldb` for those. The first load
+  builds pwndbg's Python environment locally, which takes a few minutes.
+- **`rpi-baremetal`:** an SD card's boot partition mounts at
+  `/Volumes/bootfs` (Raspberry Pi OS) or `/Volumes/<label>`, so set
+  e.g. `RPI_BOOT_DIR=/Volumes/BOOT`. Format a blank card as FAT32 with
+  Disk Utility (*MS-DOS (FAT)*, *Master Boot Record*).
+- **First load.** Most of each shell downloads prebuilt from cache.nixos.org.
+  Only small pieces (Rust toolchain components, the `mcu` CLI, wrappers) are
+  assembled locally.
 
 ## Examples / templates
 

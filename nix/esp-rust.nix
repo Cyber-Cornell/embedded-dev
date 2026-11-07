@@ -14,6 +14,17 @@ let
   version = "1.97.0.0";
   baseUrl = "https://github.com/esp-rs/rust-build/releases/download/v${version}";
 
+  srcs = {
+    x86_64-linux = fetchurl {
+      url = "${baseUrl}/rust-${version}-x86_64-unknown-linux-gnu.tar.xz";
+      hash = "sha256-qZv+5pIh6f9thjiPaBHuaIzUBeagQAo80XhOjUY+nZk=";
+    };
+    aarch64-darwin = fetchurl {
+      url = "${baseUrl}/rust-${version}-aarch64-apple-darwin.tar.xz";
+      hash = "sha256-Qw/L9Uln6Z0W3r5Ikmod9Viri2evPAYKZY0lznUr15A=";
+    };
+  };
+
   rustSrc = fetchurl {
     url = "${baseUrl}/rust-src-${version}.tar.xz";
     hash = "sha256-Vo1oi5+PMy7E0EZXVE+tI+mc4R6ebPWDWXnmiijGi3M=";
@@ -23,13 +34,12 @@ stdenv.mkDerivation {
   pname = "esp-rust";
   inherit version;
 
-  src = fetchurl {
-    url = "${baseUrl}/rust-${version}-x86_64-unknown-linux-gnu.tar.xz";
-    hash = "sha256-qZv+5pIh6f9thjiPaBHuaIzUBeagQAo80XhOjUY+nZk=";
-  };
+  src =
+    srcs.${stdenv.hostPlatform.system}
+      or (throw "esp-rust: unsupported system ${stdenv.hostPlatform.system}");
 
-  nativeBuildInputs = [ autoPatchelfHook ];
-  buildInputs = [
+  nativeBuildInputs = lib.optionals stdenv.hostPlatform.isLinux [ autoPatchelfHook ];
+  buildInputs = lib.optionals stdenv.hostPlatform.isLinux [
     stdenv.cc.cc.lib
     zlib
   ];
@@ -56,6 +66,6 @@ stdenv.mkDerivation {
       mit
       asl20
     ];
-    platforms = [ "x86_64-linux" ];
+    platforms = lib.attrNames srcs;
   };
 }

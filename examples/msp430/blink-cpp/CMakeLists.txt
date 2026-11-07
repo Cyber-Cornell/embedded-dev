@@ -21,7 +21,13 @@ add_custom_command(TARGET blink.elf POST_BUILD COMMAND ${CMAKE_SIZE} blink.elf)
 
 # `cmake --build build --target flash`. The eZ-FET on current LaunchPads
 # needs the `tilib` driver; older G2 LaunchPads (eZ430/rf2500) use `rf2500`.
-set(MSPDEBUG_DRIVER tilib CACHE STRING "mspdebug driver")
+# On macOS the `ti` shell sets MSPDEBUG_DRIVER=ezfet (no tilib there).
+if(DEFINED ENV{MSPDEBUG_DRIVER})
+  set(MSPDEBUG_DRIVER_DEFAULT $ENV{MSPDEBUG_DRIVER})
+else()
+  set(MSPDEBUG_DRIVER_DEFAULT tilib)
+endif()
+set(MSPDEBUG_DRIVER ${MSPDEBUG_DRIVER_DEFAULT} CACHE STRING "mspdebug driver")
 add_custom_target(flash
   COMMAND mspdebug ${MSPDEBUG_DRIVER} "prog blink.elf"
   DEPENDS blink.elf

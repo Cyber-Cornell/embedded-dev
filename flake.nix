@@ -24,7 +24,11 @@
       pwndbg,
     }:
     let
-      systems = [ "x86_64-linux" ];
+      # Linux on x86-64, and macOS on Apple Silicon.
+      systems = [
+        "x86_64-linux"
+        "aarch64-darwin"
+      ];
       forAllSystems = nixpkgs.lib.genAttrs systems;
 
       pkgsFor =
@@ -48,7 +52,16 @@
           clangd = pkgs.callPackage ./nix/clangd.nix { };
           esp-rust = pkgs.callPackage ./nix/esp-rust.nix { };
           rpi-run = pkgs.callPackage ./nix/rpi-run.nix { };
-          rpi-boot = pkgs.callPackage ./nix/rpi-boot.nix { };
+          rpi-boot = pkgs.callPackage ./nix/rpi-boot.nix {
+            # nixpkgs marks the firmware broken on macOS: fetching its source
+            # there gives a different hash (case-insensitive file system). The
+            # source comes prebuilt from cache.nixos.org, so it isn't fetched.
+            raspberrypifw = pkgs.raspberrypifw.overrideAttrs (old: {
+              meta = old.meta // {
+                broken = false;
+              };
+            });
+          };
           mcu = pkgs.callPackage ./nix/mcu.nix { };
         }
       );
@@ -60,6 +73,8 @@
         system:
         let
           pkgs = pkgsFor system;
+          inherit (pkgs.stdenv.hostPlatform) isLinux isDarwin;
+          inherit (pkgs.lib) optionals;
           inherit (self.packages.${system})
             msp430-gcc
             mspm0-sdk
@@ -206,13 +221,16 @@
           # STM32 (and any other Cortex-M part: TI TM4C, nRF, SAMD, ...).
           stm32 = mkTargetShell {
             name = "stm32";
-            packages = with pkgs; [
-              gcc-arm-embedded
-              openocd
-              stlink
-              probe-rs-tools
-              rustCortexM
-            ];
+            packages =
+              (with pkgs; [
+                gcc-arm-embedded
+                openocd
+                probe-rs-tools
+                rustCortexM
+              ])
+              # st-flash / st-info are Linux-only in nixpkgs; probe-rs and
+              # OpenOCD drive the ST-Link on macOS.
+              ++ optionals isLinux [ pkgs.stlink ];
           };
 
           # TI MSPM0 (Cortex-M0+; LaunchPads such as LP-MSPM0L2228). The SDK
@@ -234,13 +252,26 @@
             name = "ti";
             packages = [
               msp430-gcc
-              # tilib driver = TI MSP Debug Stack, needed for eZ-FET LaunchPads.
-              (pkgs.mspdebug.override {
-                enableMspds = true;
-                mspds = pkgs.mspds-bin; # the source build is broken against current Boost
-              })
+              (
+                if isLinux then
+                  # tilib driver = TI MSP Debug Stack, needed for eZ-FET LaunchPads.
+                  pkgs.mspdebug.override {
+                    enableMspds = true;
+                    mspds = pkgs.mspds-bin; # the source build is broken against current Boost
+                  }
+                else
+                  # TI ships the MSP Debug Stack for macOS as an x86-64 library
+                  # only, which an Apple Silicon mspdebug can't load. mspdebug's
+                  # own `ezfet` driver talks to the eZ-FET without it.
+                  pkgs.mspdebug
+              )
               rustNightly
             ];
+            # The examples' flash target (CMake) and Cargo runner use these.
+            env = pkgs.lib.optionalAttrs isDarwin {
+              MSPDEBUG_DRIVER = "ezfet";
+              CARGO_TARGET_MSP430_NONE_ELF_RUNNER = "mspdebug ezfet prog";
+            };
           };
 
           # Raspberry Pi 3, 4, 5, Zero, Zero W, Zero 2 W (Linux userspace).
@@ -295,16 +326,23 @@
           };
 
           # Plain programs for this computer in C, C++, Rust and Python: no
-          # board, no cross compiler. (mkShell's own GCC builds the C/C++.)
+          # board, no cross compiler. (mkShell's own compiler builds the C/C++:
+          # GCC on Linux, Apple's clang on macOS.) macOS has no valgrind, and
+          # gdb can't debug macOS programs, so it gets lldb instead.
           base = mkTargetShell {
             name = "base";
-            packages =
-              (with pkgs; [
+            packages = [
+              rustHost
+            ]
+            ++ optionals isLinux (
+              with pkgs;
+              [
                 gdb
                 valgrind
-                rustHost
-              ])
-              ++ pythonTools;
+              ]
+            )
+            ++ optionals isDarwin [ pkgs.lldb ]
+            ++ pythonTools;
             env = uvEnv;
           };
 
@@ -331,13 +369,11 @@
                   binwalk # carve and identify firmware images
                   hexyl
                   file
-                  checksec
                   patchelf
                   # Debugging and emulation. nixpkgs' gdb is multi-arch (Arm,
                   # RISC-V, x86, ...); pwndbg is its own `pwndbg` command.
                   gdb
                   pwndbg-cmd
-                  strace
                   qemu # qemu-system-arm etc. and qemu-<arch> user mode
                   # Talking to Cortex-M targets: arm-none-eabi binutils/GCC
                   # (also lets pwntools assemble Arm), debug probes.
@@ -350,18 +386,29 @@
                   sigrok-cli
                   # Network services
                   socat
-                  netcat-openbsd
                 ])
+                # Linux-only tools. On macOS, `nc` is the system's own netcat,
+                # and checksec's job is done by `uv run elfinfo` (lab-python).
+                ++ optionals isLinux (
+                  with pkgs;
+                  [
+                    checksec
+                    strace
+                    netcat-openbsd
+                  ]
+                )
                 ++ pythonTools;
-              env = uvEnv // {
-                # Binary wheels from PyPI (numpy, lief, z3, angr, keystone, ...)
-                # expect the C++ runtime and zlib in the usual system places,
-                # which NixOS doesn't have.
-                LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [
-                  pkgs.stdenv.cc.cc.lib
-                  pkgs.zlib
-                ];
-              };
+              env =
+                uvEnv
+                // pkgs.lib.optionalAttrs isLinux {
+                  # Binary wheels from PyPI (numpy, lief, z3, angr, keystone, ...)
+                  # expect the C++ runtime and zlib in the usual system places,
+                  # which NixOS doesn't have.
+                  LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [
+                    pkgs.stdenv.cc.cc.lib
+                    pkgs.zlib
+                  ];
+                };
             };
         }
       );
